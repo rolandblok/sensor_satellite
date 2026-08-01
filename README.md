@@ -95,3 +95,7 @@ arduino-cli compile --upload -p COM5 \
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |
 | [`proto_oled_d1_mini.md`](proto_oled_d1_mini.md) | earlier ESP8266 bench rig and its power analysis |
+
+## Licence
+
+Public domain — [The Unlicense](UNLICENSE). Do whatever you like with it.
