@@ -1,0 +1,624 @@
+<mxfile host="65bd71144e">
+    <diagram name="Solar sensor node" id="solar-node">
+        <mxGraphModel dx="1513" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1150" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="sensor satellite — solar / supercap power chain" style="text;html=1;fontSize=24;fontStyle=1;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="30" width="700" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" value="2 x 5 V panel (parallel) → blocking diodes → 5.5 V 4 F supercap → low-Iq LDO → ESP32-C3 + BME280 + 2.9&quot; e-paper" style="text;html=1;fontSize=13;fontColor=#666666;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="66" width="900" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="zone_harvest" value="HARVEST" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=11;fontColor=#7f6000;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="120" width="330" height="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="zone_store" value="STORE &amp; PROTECT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=11;fontColor=#1f4e79;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="410" y="120" width="300" height="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="zone_load" value="REGULATE &amp; LOAD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#82b366;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=11;fontColor=#255d1c;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="740" y="120" width="800" height="640" as="geometry"/>
+                </mxCell>
+                <mxCell id="sp1" value="&lt;b&gt;SOLAR PANEL 1&lt;/b&gt;&lt;br&gt;5 V / 200 mA / 1 W&lt;br&gt;&lt;font color=&quot;#7f6000&quot;&gt;Voc up to ~6.5 V&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;+&lt;/b&gt; red → D1&lt;/font&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;−&lt;/b&gt; black → GND" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="170" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="sp2" value="&lt;b&gt;SOLAR PANEL 2&lt;/b&gt;&lt;br&gt;5 V / 200 mA / 1 W&lt;br&gt;&lt;font color=&quot;#7f6000&quot;&gt;Voc up to ~6.5 V&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;+&lt;/b&gt; red → D2&lt;/font&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;−&lt;/b&gt; black → GND" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="320" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="d1" value="&lt;b&gt;D1&lt;/b&gt; 1N5819&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;band →&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="180" width="80" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="d1band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#cc0000;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="352" y="180" width="8" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="d2" value="&lt;b&gt;D2&lt;/b&gt; 1N5819&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;band →&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="330" width="80" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="d2band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#cc0000;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="352" y="330" width="8" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="bandnote" value="&lt;b&gt;White band = cathode.&lt;/b&gt; It points&lt;br&gt;away from the panel, toward the cap.&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;drop ~0.3 V · see the BENCH TEST tab&lt;/font&gt;" style="text;html=1;fontSize=10;align=left;verticalAlign=top;fontColor=#cc0000;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="245" width="230" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="parallel_note" value="&lt;b&gt;PARALLEL&lt;/b&gt; — not series.&lt;br&gt;Series would give ~12 V and&lt;br&gt;destroy the 5.5 V cap.&lt;br&gt;Separate diodes stop a shaded&lt;br&gt;panel sinking the other&#39;s current." style="text;html=1;fontSize=11;align=left;verticalAlign=top;fontColor=#7f6000;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="270" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="railtop" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="546" y="196" width="8" height="8" as="geometry"/>
+                </mxCell>
+                <mxCell id="raillabel" value="&lt;b&gt;VCAP rail&lt;/b&gt;&amp;nbsp; ~4.6 V charged" style="text;html=1;fontSize=12;align=left;fontColor=#1f4e79;" parent="1" vertex="1">
+                    <mxGeometry x="566" y="180" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="clamp" value="&lt;b&gt;OVERVOLTAGE CLAMP&lt;/b&gt;&lt;br&gt;5.1 V shunt&lt;br&gt;TL431 or 5.1 V zener&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;required — Voc &gt; cap rating&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="250" width="220" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="cap" value="&lt;b&gt;SUPERCAP&lt;/b&gt;&lt;br&gt;5.5 V   4 F&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;2 x 2.7 V cells in series&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="380" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="balance" value="&lt;b&gt;CELL BALANCING&lt;/b&gt;&lt;br&gt;2 x 100 kΩ across each cell&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;skip only if the module&lt;br&gt;already has them fitted&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="500" width="220" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="divider" value="&lt;b&gt;VCAP SENSE&lt;/b&gt;&lt;br&gt;1 MΩ / 1 MΩ + 100 nF&lt;br&gt;→ GPIO2 (ADC1)&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;2.7 µA bleed&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="620" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="ldo" value="&lt;b&gt;LOW-Iq LDO&lt;/b&gt;&lt;br&gt;3.3 V out&lt;br&gt;MCP1700 / TPS7A02&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Iq ≤ 2 µA, dropout &lt; 200 mV&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="180" width="200" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="rail3v3" value="&lt;b&gt;3V3 rail&lt;/b&gt;" style="text;html=1;fontSize=12;align=left;fontColor=#255d1c;" parent="1" vertex="1">
+                    <mxGeometry x="1010" y="200" width="100" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="esp" value="&lt;b&gt;ESP32-C3 SuperMini&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;GPIO0  SDA  → BME280&lt;br&gt;GPIO1  SCL  → BME280&lt;br&gt;GPIO2  ADC  ← Vcap&lt;br&gt;GPIO3  DC   → e-paper&lt;br&gt;GPIO4  CLK  → e-paper&lt;br&gt;GPIO5  RST  → e-paper&lt;br&gt;GPIO6  DIN  → e-paper&lt;br&gt;GPIO7  CS   → e-paper&lt;br&gt;GPIO10 BUSY ← e-paper&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;radios never initialised&lt;br&gt;deep sleep between cycles&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;verticalAlign=top;spacingTop=8;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="330" width="290" height="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="bme" value="&lt;b&gt;BME280&lt;/b&gt;&lt;br&gt;I²C @ 0x76&lt;br&gt;T / RH / pressure&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;forced mode, ~0 µA avg&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="330" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="epd" value="&lt;b&gt;2.9&quot; E-PAPER&lt;/b&gt;&lt;br&gt;296 x 128 b/w, SSD1680&lt;br&gt;4-wire SPI (BS = 0)&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;~2.5 s refresh, then 0 mA&lt;br&gt;image held with no power&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="480" width="220" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="gnd" value="&lt;b&gt;GND&lt;/b&gt; — common to panels, cap, LDO, MCU, sensor, panel" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontColor=#333333;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="790" width="1320" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_sp1_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#d79b00;endArrow=block;" parent="1" source="sp1" target="d1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_sp2_d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#d79b00;endArrow=block;" parent="1" source="sp2" target="d2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_d1_rail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#d79b00;endArrow=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="d1" target="railtop" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_d2_rail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#d79b00;endArrow=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="d2" target="railtop" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="420" y="360"/>
+                            <mxPoint x="420" y="200"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e_rail_clamp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=none;" parent="1" source="railtop" target="clamp" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_clamp_cap" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=none;" parent="1" source="clamp" target="cap" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_cap_bal" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=none;dashed=1;" parent="1" source="cap" target="balance" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_bal_div" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=none;" parent="1" source="balance" target="divider" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_rail_ldo" value="4.6 V → 3.6 V usable" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#82b366;endArrow=block;fontSize=11;verticalAlign=bottom;" parent="1" source="railtop" target="ldo" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_ldo_esp" value="3.3 V" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#82b366;endArrow=block;fontSize=11;" parent="1" source="ldo" target="esp" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_esp_bme" value="I²C" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#9673a6;startArrow=oval;endArrow=block;fontSize=11;" parent="1" source="esp" target="bme" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_esp_epd" value="SPI + BUSY" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#9673a6;startArrow=oval;endArrow=block;fontSize=11;" parent="1" source="esp" target="epd" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_div_esp" value="ADC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=block;dashed=1;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.9;entryDx=0;entryDy=0;" parent="1" source="divider" target="esp" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="notes" value="&lt;b&gt;DESIGN NOTES&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;1. Panels in parallel.&lt;/b&gt; Two 5 V panels in series give ~12 V and would destroy a 5.5 V cap.&lt;br&gt;Parallel keeps the voltage and doubles the current: 400 mA in full sun.&lt;br&gt;&lt;br&gt;&lt;b&gt;2. One diode per panel.&lt;/b&gt; D1/D2 block night-time discharge back into the panels &lt;i&gt;and&lt;/i&gt;&lt;br&gt;stop a shaded panel from sinking current from the lit one. A single shared diode does not.&lt;br&gt;&lt;br&gt;&lt;b&gt;3. The clamp is not optional.&lt;/b&gt; A &quot;5 V&quot; panel reaches ~6.5 V open-circuit in bright sun.&lt;br&gt;The cap is rated 5.5 V absolute. Without a shunt clamp, a sunny afternoon with the node&lt;br&gt;asleep will overvolt it.&lt;br&gt;&lt;br&gt;&lt;b&gt;4. Usable energy is charge, not ½CV².&lt;/b&gt; The LDO drops out around 3.6 V, so only&lt;br&gt;4 F x (4.6 - 3.6) = 4 C is usable — about 13 J at 3.3 V, not the 60 J the raw cap figure suggests.&lt;br&gt;&lt;br&gt;&lt;b&gt;5. Sense divider must be high impedance.&lt;/b&gt; 100 k/100 k bleeds 27 µA — comparable to the&lt;br&gt;whole sleep budget. 1 M/1 M bleeds 2.7 µA; add 100 nF at the tap for the ADC to charge from.&lt;br&gt;&lt;br&gt;&lt;b&gt;6. Charging is fast, harvesting is not.&lt;/b&gt; 4 C at 400 mA is ~10 s of full sun. The design&lt;br&gt;constraint is overcast days and winter, not charge time." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#999999;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="860" width="1320" height="370" as="geometry"/>
+                </mxCell>
+                <mxCell id="todo" value="&lt;b&gt;MEASURE FIRST&lt;/b&gt;&lt;br&gt;Active current, sleep current and refresh&lt;br&gt;energy are still unmeasured. They decide&lt;br&gt;whether one panel is enough — and whether&lt;br&gt;4 F is too small.&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;Do not order parts from this drawing yet.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="620" width="300" height="140" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="BENCH TEST — 2 panels" id="bench-test">
+        <mxGraphModel dx="774" dy="536" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+            <root>
+                <mxCell id="b0"/>
+                <mxCell id="b1" parent="b0"/>
+                <mxCell id="btitle" value="BENCH TEST — two panels: which wire goes where" style="text;html=1;fontSize=24;fontStyle=1;align=left;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="50" y="25" width="1000" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bsub" value="Stage 1 of bring-up: two panels, two diodes, one supercap. No clamp and no external LDO needed yet." style="text;html=1;fontSize=13;fontColor=#666666;align=left;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="50" y="60" width="1000" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="brule" value="&lt;b&gt;THE RULE&lt;/b&gt;&amp;nbsp;&amp;nbsp; Each panel &lt;b&gt;+&lt;/b&gt; → its own diode → &lt;b&gt;VCAP +&lt;/b&gt;.&amp;nbsp;&amp;nbsp; The &lt;b&gt;WHITE BAND is the exit&lt;/b&gt; — away from the panel, toward the cap.&amp;nbsp;&amp;nbsp; The panels merge &lt;b&gt;after&lt;/b&gt; the diodes, never before." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;align=left;spacingLeft=16;" parent="b1" vertex="1">
+                    <mxGeometry x="50" y="100" width="1450" height="52" as="geometry"/>
+                </mxCell>
+                <mxCell id="bsp1" value="&lt;b&gt;SOLAR PANEL 1&lt;/b&gt;&lt;br&gt;5 V / 200 mA / 1 W&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;~6.5 V open circuit&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" parent="b1" vertex="1">
+                    <mxGeometry x="80" y="190" width="220" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="bsp1p" value="&lt;b&gt;+&lt;/b&gt; red" style="text;html=1;fontSize=13;fontColor=#cc0000;fontStyle=1;align=left;" parent="b1" vertex="1">
+                    <mxGeometry x="306" y="230" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="bsp1m" value="&lt;b&gt;−&lt;/b&gt; black" style="text;html=1;fontSize=13;fontColor=#000000;fontStyle=1;align=left;" parent="b1" vertex="1">
+                    <mxGeometry x="306" y="268" width="80" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="bsp2" value="&lt;b&gt;SOLAR PANEL 2&lt;/b&gt;&lt;br&gt;5 V / 200 mA / 1 W&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;~6.5 V open circuit&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" parent="b1" vertex="1">
+                    <mxGeometry x="80" y="340" width="220" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="bsp2p" value="&lt;b&gt;+&lt;/b&gt; red" style="text;html=1;fontSize=13;fontColor=#cc0000;fontStyle=1;align=left;" parent="b1" vertex="1">
+                    <mxGeometry x="306" y="380" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="bsp2m" value="&lt;b&gt;−&lt;/b&gt; black" style="text;html=1;fontSize=13;fontColor=#000000;fontStyle=1;align=left;" parent="b1" vertex="1">
+                    <mxGeometry x="306" y="418" width="80" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="bw_sp1p" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#cc0000;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="245" as="sourcePoint"/>
+                        <mxPoint x="500" y="245" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bw_sp2p" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#cc0000;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="395" as="sourcePoint"/>
+                        <mxPoint x="500" y="395" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bw_sp1m" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="283" as="sourcePoint"/>
+                        <mxPoint x="350" y="650" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="350" y="283"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bw_sp2m" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="433" as="sourcePoint"/>
+                        <mxPoint x="410" y="650" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="410" y="433"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bd1lab" value="&lt;b&gt;D1 — 1N5819&lt;/b&gt;" style="text;html=1;fontSize=13;align=center;" parent="b1" vertex="1">
+                    <mxGeometry x="500" y="198" width="130" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd1body" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#000000;" parent="b1" vertex="1">
+                    <mxGeometry x="500" y="225" width="130" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd1band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#f0f0f0;" parent="b1" vertex="1">
+                    <mxGeometry x="608" y="225" width="14" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd1a" value="&lt;b&gt;A&lt;/b&gt; plain end&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;← panel 1 +&lt;/font&gt;" style="text;html=1;fontSize=11;align=center;verticalAlign=top;" parent="b1" vertex="1">
+                    <mxGeometry x="450" y="270" width="110" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd1k" value="&lt;b&gt;&lt;font color=&quot;#cc0000&quot;&gt;K — WHITE BAND&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;→ VCAP +&lt;/font&gt;" style="text;html=1;fontSize=11;align=center;verticalAlign=top;" parent="b1" vertex="1">
+                    <mxGeometry x="570" y="270" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd2lab" value="&lt;b&gt;D2 — 1N5819&lt;/b&gt;" style="text;html=1;fontSize=13;align=center;" parent="b1" vertex="1">
+                    <mxGeometry x="500" y="348" width="130" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd2body" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#000000;" parent="b1" vertex="1">
+                    <mxGeometry x="500" y="375" width="130" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd2band" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#f0f0f0;" parent="b1" vertex="1">
+                    <mxGeometry x="608" y="375" width="14" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd2a" value="&lt;b&gt;A&lt;/b&gt; plain end&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;← panel 2 +&lt;/font&gt;" style="text;html=1;fontSize=11;align=center;verticalAlign=top;" parent="b1" vertex="1">
+                    <mxGeometry x="450" y="420" width="110" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bd2k" value="&lt;b&gt;&lt;font color=&quot;#cc0000&quot;&gt;K — WHITE BAND&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;→ VCAP +&lt;/font&gt;" style="text;html=1;fontSize=11;align=center;verticalAlign=top;" parent="b1" vertex="1">
+                    <mxGeometry x="570" y="420" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bw_d1k" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#d79b00;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="630" y="245" as="sourcePoint"/>
+                        <mxPoint x="760" y="245" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bw_d2k" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#d79b00;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="630" y="395" as="sourcePoint"/>
+                        <mxPoint x="760" y="395" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bw_bus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="760" y="245" as="sourcePoint"/>
+                        <mxPoint x="760" y="480" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bnode1" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" parent="b1" vertex="1">
+                    <mxGeometry x="755" y="240" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="bnode2" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" parent="b1" vertex="1">
+                    <mxGeometry x="755" y="390" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="bvcaplab" value="&lt;b&gt;VCAP +&lt;/b&gt;&amp;nbsp; both bands land here&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;this is the merge point — the panels never touch each other directly&lt;/font&gt;" style="text;html=1;fontSize=12;align=left;fontColor=#1f4e79;" parent="b1" vertex="1">
+                    <mxGeometry x="775" y="188" width="420" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bcap" value="&lt;b&gt;SUPERCAP&lt;/b&gt;&lt;br&gt;5.5 V / 4 F&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;+&lt;/b&gt; = long lead / marked side&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;polarised — backwards destroys it&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="b1" vertex="1">
+                    <mxGeometry x="660" y="480" width="200" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="bw_capgnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="760" y="590" as="sourcePoint"/>
+                        <mxPoint x="760" y="650" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bboard" value="&lt;b&gt;ESP32-C3 SuperMini&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;5V&amp;nbsp;&amp;nbsp;pin ← VCAP +&lt;br&gt;GND pin ← GND&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;its onboard regulator makes 3V3,&lt;br&gt;happy from 4.5 to 6.5 V&lt;br&gt;connect last, USB unplugged&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;verticalAlign=top;spacingTop=8;" parent="b1" vertex="1">
+                    <mxGeometry x="1140" y="185" width="290" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="bw_board" value="4.5 – 6.5 V" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#82b366;endArrow=block;fontSize=11;verticalAlign=bottom;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="765" y="245" as="sourcePoint"/>
+                        <mxPoint x="1140" y="245" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bw_boardgnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="b1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1400" y="345" as="sourcePoint"/>
+                        <mxPoint x="1400" y="650" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bgnd" value="&lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; panel 1 −&amp;nbsp; ·&amp;nbsp; panel 2 −&amp;nbsp; ·&amp;nbsp; cap −&amp;nbsp; ·&amp;nbsp; SuperMini GND&amp;nbsp; ·&amp;nbsp; meter black probe&amp;nbsp;&amp;nbsp; — all one node, no diode in this path" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#000000;fontSize=13;fontColor=#ffffff;align=left;spacingLeft=16;" parent="b1" vertex="1">
+                    <mxGeometry x="80" y="650" width="1350" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="bclampnote" value="&lt;b&gt;WHY NO CLAMP YET&lt;/b&gt;&lt;br&gt;The 5.1 V clamp on the main tab is required for &lt;i&gt;unattended&lt;/i&gt;&lt;br&gt;operation, where a sunny afternoon pushes the cap past&lt;br&gt;5.5 V while the node sleeps. Two panels make that faster,&lt;br&gt;not slower. At the bench, with a meter on the cap and you&lt;br&gt;watching it, the clamp is not needed.&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;Do not leave this rig in a window unattended.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;dashed=1;" parent="b1" vertex="1">
+                    <mxGeometry x="960" y="400" width="420" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn_twodiodes" value="&lt;b&gt;WHY TWO DIODES, NOT ONE&lt;/b&gt;&lt;br&gt;&lt;br&gt;One shared diode after the merge does the &lt;b&gt;night&lt;/b&gt; job fine: it blocks the cap discharging back into the panels.&lt;br&gt;&lt;br&gt;It does not do the &lt;b&gt;daylight&lt;/b&gt; job. Wired + to +, the panels are one node and must sit at one voltage. The better-lit panel sets it — and holding a solar cell above its own operating point forward-biases it, so it &lt;i&gt;sinks&lt;/i&gt; current instead of sourcing it.&lt;br&gt;&lt;br&gt;Two diodes make each panel one-way: it can give to VCAP, never take from it.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;No extra voltage cost — current still crosses exactly one diode either way.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="b1" vertex="1">
+                    <mxGeometry x="80" y="710" width="340" height="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn_series" value="&lt;b&gt;WHY PARALLEL, NOT SERIES&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Voltage.&lt;/b&gt; Series gives ~13 V open circuit into a cap rated 5.5 V absolute. That alone ends it.&lt;br&gt;&lt;br&gt;&lt;b&gt;Shading.&lt;/b&gt; The deeper reason. A series string carries the &lt;i&gt;worst&lt;/i&gt; panel&#39;s current — shade one and both are throttled. In parallel, shading one panel costs you that panel and nothing else. Graceful, not cliff-edge.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Series plus a buck converter is a legitimate design and slightly better in low light. Ruled out here on quiescent current: the budget is ≤2 µA for the whole regulator, and most bucks sit well above that.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="b1" vertex="1">
+                    <mxGeometry x="440" y="710" width="340" height="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn_band" value="&lt;b&gt;GETTING THE BAND RIGHT&lt;/b&gt;&lt;br&gt;&lt;br&gt;The band marks the &lt;b&gt;cathode&lt;/b&gt; — the end current leaves by. Band toward the cap, never toward the panel.&lt;br&gt;&lt;br&gt;&lt;b&gt;Backwards gives no smoke and no heat.&lt;/b&gt; The cap just never charges. That is the only symptom, so check the band before suspecting the panel.&lt;br&gt;&lt;br&gt;&lt;b&gt;Confirm it, meter in diode mode:&lt;/b&gt;&lt;br&gt;red on plain end, black on band → &lt;b&gt;0.2-0.3 V&lt;/b&gt;&lt;br&gt;probes swapped → &lt;b&gt;OL / open&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Do this to both diodes before wiring anything.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="b1" vertex="1">
+                    <mxGeometry x="800" y="710" width="340" height="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn_order" value="&lt;b&gt;TEST ORDER — measure, then connect&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;1. Each panel alone, unconnected.&lt;/b&gt; DC volts across its leads. Both should read within ~0.2 V of each other in the same light. A positive reading means red probe is on +.&lt;br&gt;&lt;br&gt;&lt;b&gt;2. Each panel alone, short-circuit current.&lt;/b&gt; Meter in current mode straight across the leads — safe, a panel is current-limited by physics. Write both numbers down.&lt;br&gt;&lt;br&gt;&lt;b&gt;3. Both panels, both diodes, cap. No board.&lt;/b&gt; Charge current should be close to the &lt;i&gt;sum&lt;/i&gt; of the two Isc figures. Near one panel&#39;s figure = a diode is backwards.&lt;br&gt;&lt;br&gt;&lt;b&gt;4. Cover one panel.&lt;/b&gt; Current should drop by that panel&#39;s share and no further. That is the two-diode design doing its job.&lt;br&gt;&lt;br&gt;&lt;b&gt;5. Then the board&lt;/b&gt;, cap already above 4.5 V." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#999999;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="b1" vertex="1">
+                    <mxGeometry x="1160" y="710" width="340" height="290" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn_never" value="&lt;b&gt;NEVER DO THIS&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;Panel to the 3V3 pin&lt;/b&gt; — 6.5 V kills the C3, the BME280 and the e-paper at once; the panel only ever touches &lt;b&gt;5V&lt;/b&gt;, and only through a diode.&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;Panel and USB together&lt;/b&gt; — unplug USB before running from solar; the diode protects the panel, but the SuperMini has no VBUS diode, so a lit panel back-feeds the USB host.&lt;br&gt;&lt;b&gt;Panels in series&lt;/b&gt; — ~13 V straight through a 5.5 V cap.&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;Panels + to + without diodes&lt;/b&gt; — see the orange box.&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;Cap backwards&lt;/b&gt; — supercaps are polarised; marked lead to VCAP +, other lead to GND." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="b1" vertex="1">
+                    <mxGeometry x="80" y="1030" width="1420" height="120" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="BENCH TEST — cap and load" id="bench-cap">
+        <mxGraphModel dx="1513" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1220" math="0" shadow="0">
+            <root>
+                <mxCell id="c0"/>
+                <mxCell id="c1" parent="c0"/>
+                <mxCell id="ctitle" value="BENCH TEST — supercap, dummy load and where to put the probes" style="text;html=1;fontSize=24;fontStyle=1;align=left;verticalAlign=middle;" parent="c1" vertex="1">
+                    <mxGeometry x="50" y="25" width="1100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="csub" value="Stage 2. Panels and diodes already verified at 4.8 V. Now: does the cap hold that, and how long does it run a load?" style="text;html=1;fontSize=13;fontColor=#666666;align=left;verticalAlign=middle;" parent="c1" vertex="1">
+                    <mxGeometry x="50" y="60" width="1100" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="crule" value="&lt;b&gt;ONE METER, TWO READINGS&lt;/b&gt;&amp;nbsp;&amp;nbsp; Volts across the &lt;b&gt;cap&lt;/b&gt; = state of charge.&amp;nbsp;&amp;nbsp; Volts across the &lt;b&gt;load resistor&lt;/b&gt; = current, since &lt;b&gt;I = V / R&lt;/b&gt;.&amp;nbsp;&amp;nbsp; The resistor is already a known shunt — you never need the meter&#39;s current mode." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;align=left;spacingLeft=16;" parent="c1" vertex="1">
+                    <mxGeometry x="50" y="100" width="1450" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="cpanels" value="&lt;b&gt;PANELS + D1 / D2&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;verified stage 1&lt;br&gt;4.8 V after the diodes&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="c1" vertex="1">
+                    <mxGeometry x="80" y="200" width="200" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_p_link" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#d79b00;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="280" y="245" as="sourcePoint"/>
+                        <mxPoint x="305" y="245" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="clink1" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" parent="c1" vertex="1">
+                    <mxGeometry x="305" y="240" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="clink2" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" parent="c1" vertex="1">
+                    <mxGeometry x="345" y="240" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_link" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#999999;endArrow=none;dashed=1;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="315" y="245" as="sourcePoint"/>
+                        <mxPoint x="345" y="245" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="clinklabel" value="&lt;b&gt;REMOVABLE LINK&lt;/b&gt;&lt;br&gt;pull it for the leakage&lt;br&gt;and discharge tests" style="text;html=1;fontSize=10;align=center;verticalAlign=top;fontColor=#b85450;" parent="c1" vertex="1">
+                    <mxGeometry x="255" y="258" width="150" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_link_bus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#d79b00;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="355" y="245" as="sourcePoint"/>
+                        <mxPoint x="520" y="245" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cnode" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" parent="c1" vertex="1">
+                    <mxGeometry x="515" y="240" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="cvcaplabel" value="&lt;b&gt;VCAP +&lt;/b&gt;" style="text;html=1;fontSize=13;align=left;fontColor=#1f4e79;" parent="c1" vertex="1">
+                    <mxGeometry x="535" y="208" width="120" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_bus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="520" y="245" as="sourcePoint"/>
+                        <mxPoint x="520" y="340" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ccap" value="&lt;b&gt;SUPERCAP&lt;/b&gt;&lt;br&gt;5.5 V / 4 F&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;marked lead up&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" parent="c1" vertex="1">
+                    <mxGeometry x="420" y="340" width="200" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ccapplus" value="&lt;b&gt;+&lt;/b&gt; to VCAP" style="text;html=1;fontSize=12;fontColor=#cc0000;fontStyle=1;align=left;" parent="c1" vertex="1">
+                    <mxGeometry x="632" y="336" width="110" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="ccapminus" value="&lt;b&gt;−&lt;/b&gt; to GND&amp;nbsp;&amp;nbsp;&lt;font color=&quot;#666666&quot;&gt;— straight down, nothing in the way&lt;/font&gt;" style="text;html=1;fontSize=12;fontColor=#000000;fontStyle=1;align=left;" parent="c1" vertex="1">
+                    <mxGeometry x="632" y="456" width="350" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_capgnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="520" y="470" as="sourcePoint"/>
+                        <mxPoint x="520" y="650" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cw_bus_ldo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="520" y="245" as="sourcePoint"/>
+                        <mxPoint x="760" y="245" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cldo" value="&lt;b&gt;HT7533&lt;/b&gt;&amp;nbsp; 3.3 V LDO&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;1 GND · 2 VIN · 3 VOUT&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;1 µF in · 1 µF out&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="c1" vertex="1">
+                    <mxGeometry x="760" y="205" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_ldognd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="790" y="295" as="sourcePoint"/>
+                        <mxPoint x="790" y="650" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cldopins" value="&lt;b&gt;HT7533 TO-92 — VERIFIED&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;flat face toward you, pins down&lt;/font&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;3&quot;&gt;&amp;nbsp;&amp;nbsp;1&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;2&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;3&lt;br&gt;&amp;nbsp;&lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;VIN&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;VOUT&lt;/b&gt;&lt;br&gt;&amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;|&lt;br&gt;&amp;nbsp;rail&amp;nbsp;&amp;nbsp;VCAP&amp;nbsp;&amp;nbsp;load&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=center;verticalAlign=top;spacingTop=8;" parent="c1" vertex="1">
+                    <mxGeometry x="880" y="320" width="300" height="135" as="geometry"/>
+                </mxCell>
+                <mxCell id="c3v3" value="&lt;b&gt;3V3&lt;/b&gt;" style="text;html=1;fontSize=12;align=left;fontColor=#255d1c;" parent="c1" vertex="1">
+                    <mxGeometry x="1030" y="218" width="60" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_ldores" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#82b366;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="980" y="245" as="sourcePoint"/>
+                        <mxPoint x="1150" y="245" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cres" value="&lt;b&gt;DUMMY LOAD&lt;/b&gt;&lt;br&gt;130 Ω&amp;nbsp; 0.25 W&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;= 25.4 mA&lt;br&gt;≈ ESP active&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="c1" vertex="1">
+                    <mxGeometry x="1150" y="205" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_resgnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1240" y="295" as="sourcePoint"/>
+                        <mxPoint x="1240" y="650" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cmeterA" value="V" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;fontSize=28;fontStyle=1;" parent="c1" vertex="1">
+                    <mxGeometry x="200" y="370" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_mA_red" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#cc0000;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="272" y="390" as="sourcePoint"/>
+                        <mxPoint x="420" y="375" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cw_mA_blk" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#000000;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="272" y="432" as="sourcePoint"/>
+                        <mxPoint x="420" y="450" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cmeterAlab" value="&lt;b&gt;PROBE 1&lt;/b&gt;&amp;nbsp; DCV across the cap&lt;br&gt;= state of charge" style="text;html=1;fontSize=11;align=center;verticalAlign=top;" parent="c1" vertex="1">
+                    <mxGeometry x="140" y="458" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="cmeterB" value="V" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;fontSize=28;fontStyle=1;" parent="c1" vertex="1">
+                    <mxGeometry x="1390" y="210" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw_mB_red" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#cc0000;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1330" y="222" as="sourcePoint"/>
+                        <mxPoint x="1398" y="232" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cw_mB_blk" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#000000;endArrow=none;" parent="c1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1330" y="278" as="sourcePoint"/>
+                        <mxPoint x="1398" y="268" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="cmeterBlab" value="&lt;b&gt;PROBE 2&lt;/b&gt;&amp;nbsp; DCV across R&lt;br&gt;&lt;b&gt;I = V / R&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;3.3 V / 130 Ω = 25.4 mA&lt;/font&gt;" style="text;html=1;fontSize=11;align=center;verticalAlign=top;" parent="c1" vertex="1">
+                    <mxGeometry x="1340" y="298" width="180" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="cgnd" value="&lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; panel 1 −&amp;nbsp; ·&amp;nbsp; panel 2 −&amp;nbsp; ·&amp;nbsp; &lt;b&gt;supercap −&lt;/b&gt;&amp;nbsp; ·&amp;nbsp; LDO GND&amp;nbsp; ·&amp;nbsp; dummy load&amp;nbsp; ·&amp;nbsp; meter black probe&amp;nbsp;&amp;nbsp; — one node, plain copper" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#000000;fontSize=13;fontColor=#ffffff;align=left;spacingLeft=16;" parent="c1" vertex="1">
+                    <mxGeometry x="80" y="650" width="1400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cn_gnd" value="&lt;b&gt;WHERE THE MINUS GOES&lt;/b&gt;&lt;br&gt;&lt;br&gt;Straight to &lt;b&gt;GND&lt;/b&gt; — the same node as everything else on the bench.&lt;br&gt;&lt;br&gt;GND is: panel 1 −, panel 2 −, supercap −, LDO GND, the bottom of the dummy load, your meter&#39;s black probe, and later the ESP&#39;s GND pin.&lt;br&gt;&lt;br&gt;&lt;b&gt;One node, joined by plain copper.&lt;/b&gt; No diode, no resistor, no switch anywhere in it.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;Putting a shunt resistor in the ground leg to read current is tempting and wrong: every voltage in the circuit is referenced to that node, so a shunt there shifts all of them at once and corrupts every other reading. Measure across the load instead.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#999999;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="c1" vertex="1">
+                    <mxGeometry x="80" y="700" width="340" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="cn_size" value="&lt;b&gt;SIZING THE DUMMY LOAD&lt;/b&gt;&lt;br&gt;&lt;br&gt;The resistor stands in for the ESP. Pick it for the current you want to imitate.&lt;br&gt;&lt;br&gt;&lt;b&gt;With the LDO fitted&lt;/b&gt; — resistor on 3V3:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;active&amp;nbsp; 25 mA → &lt;b&gt;130 Ω&lt;/b&gt; 0.25 W&lt;br&gt;refresh 45 mA → 68 Ω 0.5 W&lt;br&gt;sleep&amp;nbsp;&amp;nbsp; 50 µA → 68 kΩ&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Without the LDO&lt;/b&gt; — resistor on VCAP at 4.6 V:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;active&amp;nbsp; 25 mA → 180 Ω 0.25 W&lt;br&gt;sleep&amp;nbsp;&amp;nbsp; 50 µA → 100 kΩ&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;The LDO version is the better test. A series regulator draws roughly its output current at its input, so the cap sees a &lt;b&gt;constant&lt;/b&gt; 22 mA all the way down. A bare resistor on VCAP gives an RC decay — current fades as the cap empties, which the ESP does not do.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="c1" vertex="1">
+                    <mxGeometry x="440" y="700" width="340" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="cn_three" value="&lt;b&gt;THE THREE MEASUREMENTS&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;1. CHARGE.&lt;/b&gt; Link in, panels lit, no load. Probe 1 every minute. Expect a straight ramp, then a knee, then a crawl as it nears the panel voltage.&lt;br&gt;&lt;br&gt;&lt;b&gt;2. LEAKAGE.&lt;/b&gt; Charge full, &lt;b&gt;pull the link&lt;/b&gt;, no load. Watch the cap alone for a few hours. The cap is its own coulomb meter:&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;&amp;nbsp;&amp;nbsp;I = C · dV/dt&lt;br&gt;&amp;nbsp;&amp;nbsp;at 4 F: 1 mV/hour ≈ 1.1 µA&lt;/font&gt;&lt;br&gt;&lt;br&gt;That measures the leakage floor of design note 7 with no ammeter at all.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;The meter is itself a load: 10 MΩ at 4.8 V draws 0.48 µA. Leave it connected throughout and subtract it, or probe only briefly.&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;3. DISCHARGE.&lt;/b&gt; Link out, dummy load on. Time the fall 4.6 → 3.6 V, reading probe 2 as you go." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="c1" vertex="1">
+                    <mxGeometry x="800" y="700" width="340" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="cn_expect" value="&lt;b&gt;WHAT THE NUMBERS SHOULD BE&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Discharge&lt;/b&gt;, LDO + 130 Ω, 4.6 → 3.6 V:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;expect ~157 s at ~25.4 mA&lt;/font&gt;&lt;br&gt;&lt;br&gt;That is design note 4 under test: 4 F × 1.0 V = 4 C, and 4 C / 25.4 mA = 157 s.&lt;br&gt;&lt;br&gt;&lt;b&gt;Capacitance&lt;/b&gt; falls straight out of the same run:&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;C = I · t / ΔV&lt;/font&gt;&lt;br&gt;Well under 4 F means the cap is not what the label claims — supercap tolerance is routinely −20 / +80 %.&lt;br&gt;&lt;br&gt;&lt;b&gt;ESR&lt;/b&gt;: watch for an instant step the moment the load connects. &lt;font face=&quot;Courier New&quot;&gt;step = I × ESR&lt;/font&gt;. A 200 mV step at 25.4 mA means ESR ≈ 8 Ω, which will brown out the e-paper refresh later.&lt;br&gt;&lt;br&gt;&lt;b&gt;LDO heat&lt;/b&gt;: (4.6 − 3.3) × 25.4 mA = 33 mW. Nothing to cool — but it is 28 % of the energy burnt as heat at a full cap, falling to 8 % at dropout. The buck-boost argument in miniature." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="c1" vertex="1">
+                    <mxGeometry x="1160" y="700" width="340" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="cn_never" value="&lt;b&gt;NEVER&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;Short a charged supercap.&lt;/b&gt; 4 F at 4.8 V is 46 J and tens of amps — it welds tweezers, vaporises thin wire and wrecks the cap. To empty it, hang a &lt;b&gt;100 Ω 2 W&lt;/b&gt; resistor across it and wait ~20 min. Never a screwdriver, never a wire link.&lt;br&gt;&lt;b&gt;Probe with the meter still in current mode.&lt;/b&gt; Leads left in the A jacks and touched across the cap is a dead short through the meter&#39;s shunt — blown fuse at best, and the cap can deliver far more than the fuse rating. Glance at the jacks before every probe.&lt;br&gt;&lt;b&gt;Leave the panels connected during a leakage or discharge test.&lt;/b&gt; You would be measuring charge minus drain, not either one. That is what the removable link is for." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="c1" vertex="1">
+                    <mxGeometry x="80" y="1030" width="1420" height="140" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="LDO — TO-92 pinout" id="ldo-pinout">
+        <mxGraphModel dx="1513" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1060" math="0" shadow="0">
+            <root>
+                <mxCell id="p0"/>
+                <mxCell id="p1" parent="p0"/>
+                <mxCell id="ptitle" value="HT7333 / HT7533 — TO-92 pinout: find it, do not assume it" style="text;html=1;fontSize=24;fontStyle=1;align=left;verticalAlign=middle;" parent="p1" vertex="1">
+                    <mxGeometry x="50" y="25" width="1100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="psub" value="The package convention is fixed and safe to rely on. Which function sits on which pin is not — it takes two minutes to prove." style="text;html=1;fontSize=13;fontColor=#666666;align=left;verticalAlign=middle;" parent="p1" vertex="1">
+                    <mxGeometry x="50" y="60" width="1100" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="prule" value="&lt;b&gt;THE CONVENTION&lt;/b&gt;&amp;nbsp;&amp;nbsp; Hold the part with the &lt;b&gt;flat, printed face toward you&lt;/b&gt; and the &lt;b&gt;pins pointing down&lt;/b&gt;. Pins are then numbered &lt;b&gt;1, 2, 3 left to right&lt;/b&gt;. That is universal for TO-92 and is the one thing about this package you may assume." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;align=left;spacingLeft=16;" parent="p1" vertex="1">
+                    <mxGeometry x="50" y="100" width="1450" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="pfrontlab" value="&lt;b&gt;FRONT VIEW&lt;/b&gt; — flat face toward you" style="text;html=1;fontSize=13;align=center;" parent="p1" vertex="1">
+                    <mxGeometry x="100" y="192" width="230" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="pfrontbody" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;b&gt;FLAT FACE&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cccccc&quot;&gt;printing is here&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;HT7333&lt;/b&gt;&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#000000;fontSize=13;" parent="p1" vertex="1">
+                    <mxGeometry x="120" y="220" width="190" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="pfp1" style="edgeStyle=none;rounded=0;html=1;strokeWidth=4;strokeColor=#999999;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="165" y="360" as="sourcePoint"/>
+                        <mxPoint x="165" y="425" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pfp2" style="edgeStyle=none;rounded=0;html=1;strokeWidth=4;strokeColor=#999999;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="215" y="360" as="sourcePoint"/>
+                        <mxPoint x="215" y="425" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pfp3" style="edgeStyle=none;rounded=0;html=1;strokeWidth=4;strokeColor=#999999;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="265" y="360" as="sourcePoint"/>
+                        <mxPoint x="265" y="425" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pfn1" value="&lt;b&gt;1&lt;/b&gt;" style="text;html=1;fontSize=18;align=center;" parent="p1" vertex="1">
+                    <mxGeometry x="150" y="428" width="30" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pfn2" value="&lt;b&gt;2&lt;/b&gt;" style="text;html=1;fontSize=18;align=center;" parent="p1" vertex="1">
+                    <mxGeometry x="200" y="428" width="30" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pfn3" value="&lt;b&gt;3&lt;/b&gt;" style="text;html=1;fontSize=18;align=center;" parent="p1" vertex="1">
+                    <mxGeometry x="250" y="428" width="30" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pfcap" value="Pins point down, flat face toward you.&lt;br&gt;Numbering runs &lt;b&gt;1 - 2 - 3, left to right&lt;/b&gt;." style="text;html=1;fontSize=11;align=center;verticalAlign=top;" parent="p1" vertex="1">
+                    <mxGeometry x="100" y="460" width="230" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="pbacklab" value="&lt;b&gt;BACK VIEW&lt;/b&gt; — rounded side toward you" style="text;html=1;fontSize=13;align=center;" parent="p1" vertex="1">
+                    <mxGeometry x="400" y="192" width="240" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="pbackbody" value="&lt;font color=&quot;#ffffff&quot;&gt;&lt;b&gt;ROUNDED BACK&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cccccc&quot;&gt;no printing&lt;/font&gt;&lt;/font&gt;" style="rounded=1;arcSize=45;whiteSpace=wrap;html=1;fillColor=#4d4d4d;strokeColor=#000000;fontSize=13;" parent="p1" vertex="1">
+                    <mxGeometry x="425" y="220" width="190" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="pbp1" style="edgeStyle=none;rounded=0;html=1;strokeWidth=4;strokeColor=#999999;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="470" y="360" as="sourcePoint"/>
+                        <mxPoint x="470" y="425" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pbp2" style="edgeStyle=none;rounded=0;html=1;strokeWidth=4;strokeColor=#999999;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="520" y="360" as="sourcePoint"/>
+                        <mxPoint x="520" y="425" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pbp3" style="edgeStyle=none;rounded=0;html=1;strokeWidth=4;strokeColor=#999999;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="570" y="360" as="sourcePoint"/>
+                        <mxPoint x="570" y="425" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pbn1" value="&lt;b&gt;&lt;font color=&quot;#b85450&quot;&gt;3&lt;/font&gt;&lt;/b&gt;" style="text;html=1;fontSize=18;align=center;" parent="p1" vertex="1">
+                    <mxGeometry x="455" y="428" width="30" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pbn2" value="&lt;b&gt;&lt;font color=&quot;#b85450&quot;&gt;2&lt;/font&gt;&lt;/b&gt;" style="text;html=1;fontSize=18;align=center;" parent="p1" vertex="1">
+                    <mxGeometry x="505" y="428" width="30" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pbn3" value="&lt;b&gt;&lt;font color=&quot;#b85450&quot;&gt;1&lt;/font&gt;&lt;/b&gt;" style="text;html=1;fontSize=18;align=center;" parent="p1" vertex="1">
+                    <mxGeometry x="555" y="428" width="30" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pbcap" value="&lt;font color=&quot;#b85450&quot;&gt;Same part, seen from behind. &lt;b&gt;Left and right flip.&lt;/b&gt;&lt;br&gt;This is the single most common way people&lt;br&gt;destroy a TO-92 regulator.&lt;/font&gt;" style="text;html=1;fontSize=11;align=center;verticalAlign=top;" parent="p1" vertex="1">
+                    <mxGeometry x="400" y="460" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="pfill" value="&lt;b&gt;THE RECORD&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#255d1c&quot;&gt;&lt;b&gt;HT7533 — datasheet + bench confirmed&lt;/b&gt;&lt;/font&gt;&lt;br&gt;flat face toward you, pins down:&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; 1&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; 2&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; 3&lt;br&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;VIN&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;VOUT&lt;/b&gt;&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;|&lt;br&gt;&amp;nbsp;&amp;nbsp;rail&amp;nbsp;&amp;nbsp;VCAP&amp;nbsp;&amp;nbsp;load&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;HT7333 — NOT yet verified&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;3&quot;&gt;pin 1 = ______&amp;nbsp; 2 = ______&amp;nbsp; 3 = ______&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;HT73xx and HT75xx are different series. Do not carry the HT7533 result across — run the rig below on the HT7333 before powering it.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#999999;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="p1" vertex="1">
+                    <mxGeometry x="710" y="192" width="380" height="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="pwhy" value="&lt;b&gt;WHY YOU CANNOT JUST LOOK IT UP FROM MEMORY&lt;/b&gt;&lt;br&gt;&lt;br&gt;Three-terminal regulators in TO-92 do &lt;i&gt;not&lt;/i&gt; share a pinout. Same package, same three functions, different order:&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;78L05&amp;nbsp;&amp;nbsp;&amp;nbsp; GND on pin 2 (middle)&lt;br&gt;MCP1700&amp;nbsp; GND on pin 1 (end)&lt;/font&gt;&lt;br&gt;&lt;br&gt;Both are 3-pin TO-92 linear regulators. Wiring one as the other destroys it.&lt;br&gt;&lt;br&gt;&lt;b&gt;Middle-pin GND is the more common arrangement&lt;/b&gt;, so it is a reasonable first guess — but the MCP1700 above is exactly the part this design originally specified, and it breaks that rule.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;A guess costs a destroyed part and an afternoon chasing a fault that is not in your circuit. The test below costs two minutes.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="p1" vertex="1">
+                    <mxGeometry x="1120" y="192" width="380" height="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="prigtitle" value="&lt;b&gt;THE SAFE IDENTIFICATION RIG&lt;/b&gt; — the 1 kΩ is what makes a wrong guess harmless" style="text;html=1;fontSize=15;align=left;" parent="p1" vertex="1">
+                    <mxGeometry x="80" y="562" width="800" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="psrc" value="&lt;b&gt;5 V&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;USB or bench&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="p1" vertex="1">
+                    <mxGeometry x="110" y="618" width="110" height="64" as="geometry"/>
+                </mxCell>
+                <mxCell id="pw1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#cc0000;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="220" y="640" as="sourcePoint"/>
+                        <mxPoint x="300" y="640" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pres" value="&lt;b&gt;1 kΩ&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="p1" vertex="1">
+                    <mxGeometry x="300" y="620" width="90" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="pw2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#cc0000;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="390" y="640" as="sourcePoint"/>
+                        <mxPoint x="470" y="640" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pdut" value="&lt;b&gt;PART UNDER TEST&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;candidate VIN in&lt;br&gt;candidate GND down&lt;br&gt;third pin to the meter&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" parent="p1" vertex="1">
+                    <mxGeometry x="470" y="600" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="pw3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#82b366;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="650" y="640" as="sourcePoint"/>
+                        <mxPoint x="730" y="640" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pmeter" value="V" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;fontSize=28;fontStyle=1;" parent="p1" vertex="1">
+                    <mxGeometry x="730" y="605" width="70" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="pw_srcg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="165" y="682" as="sourcePoint"/>
+                        <mxPoint x="165" y="740" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pw_dutg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="560" y="690" as="sourcePoint"/>
+                        <mxPoint x="560" y="740" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pw_mg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="p1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="765" y="675" as="sourcePoint"/>
+                        <mxPoint x="765" y="740" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="prigg" value="&lt;b&gt;GND&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#000000;fontSize=12;fontColor=#ffffff;align=left;spacingLeft=12;" parent="p1" vertex="1">
+                    <mxGeometry x="110" y="740" width="700" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="prigcap" value="&lt;b&gt;Reads 3.3 V → that assignment is correct.&lt;/b&gt; Reads 0 V, or roughly 5 V, or anything else → move to the next row of the table and try again.&lt;br&gt;&lt;br&gt;The 1 kΩ caps the current at about 5 mA whatever you connect where. That is far below anything that can damage a part rated for hundreds of mA, so a wrong guess costs you nothing but the ten seconds it takes to move a wire. &lt;b&gt;No load resistor is needed&lt;/b&gt; — the regulator&#39;s few µA of quiescent current is enough for it to regulate, and 5 mA through 1 kΩ is only a 5 mV drop, so the part still sees a full 5 V in." style="text;html=1;fontSize=12;align=left;verticalAlign=top;whiteSpace=wrap;" parent="p1" vertex="1">
+                    <mxGeometry x="110" y="778" width="700" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="ptable" value="&lt;b&gt;SIX PERMUTATIONS — WORK DOWN THE LIST&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot; size=&quot;3&quot;&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; pin1&amp;nbsp; pin2&amp;nbsp; pin3&amp;nbsp;&amp;nbsp; third pin reads&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; ----&amp;nbsp; ----&amp;nbsp; ----&amp;nbsp;&amp;nbsp; ---------------&lt;br&gt;&amp;nbsp;1&amp;nbsp;&amp;nbsp; VIN&amp;nbsp;&amp;nbsp; &lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; OUT&amp;nbsp;&amp;nbsp; ______&lt;br&gt;&amp;nbsp;2&amp;nbsp;&amp;nbsp; OUT&amp;nbsp;&amp;nbsp; &lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; VIN&amp;nbsp;&amp;nbsp; ______&lt;br&gt;&amp;nbsp;3&amp;nbsp;&amp;nbsp; &lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; VIN&amp;nbsp;&amp;nbsp; OUT&amp;nbsp;&amp;nbsp; &lt;b&gt;3.3 V ← HT7533&lt;/b&gt;&lt;br&gt;&amp;nbsp;4&amp;nbsp;&amp;nbsp; &lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; OUT&amp;nbsp;&amp;nbsp; VIN&amp;nbsp;&amp;nbsp; ______&lt;br&gt;&amp;nbsp;5&amp;nbsp;&amp;nbsp; VIN&amp;nbsp;&amp;nbsp; OUT&amp;nbsp;&amp;nbsp; &lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; ______&lt;br&gt;&amp;nbsp;6&amp;nbsp;&amp;nbsp; OUT&amp;nbsp;&amp;nbsp; VIN&amp;nbsp;&amp;nbsp; &lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; ______&lt;/font&gt;&lt;br&gt;&lt;br&gt;Rows 1 and 2 are middle-pin GND, the commoner arrangement — a reasonable place to start.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;Though note the HT7533 turned out to be row 3&lt;/b&gt; — GND on an end pin, like the MCP1700 and unlike the 78L05. The heuristic would have cost two wasted tries here. It is a starting order, not a prediction.&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Only one row can give 3.3 V. When you find it, stop, and write it into the record above.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="p1" vertex="1">
+                    <mxGeometry x="870" y="562" width="630" height="356" as="geometry"/>
+                </mxCell>
+                <mxCell id="pfinal" value="&lt;b&gt;ONCE IT IS PROVEN&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; Fit &lt;b&gt;1 µF from VIN to GND&lt;/b&gt; and &lt;b&gt;1 µF from VOUT to GND&lt;/b&gt;, ceramic, close to the pins. Without an output capacitor an LDO can oscillate, and it shows up as inexplicable brownouts rather than as an obvious fault — you would blame the supercap.&amp;nbsp;&amp;nbsp;&amp;nbsp; Then VIN to VCAP, GND to the ground rail, VOUT to the &lt;b&gt;130 Ω&lt;/b&gt; dummy load (25.4 mA) and later to the SuperMini&#39;s &lt;b&gt;3V3&lt;/b&gt; pin." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="p1" vertex="1">
+                    <mxGeometry x="80" y="945" width="1420" height="90" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
