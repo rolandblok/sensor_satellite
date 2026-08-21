@@ -4,6 +4,17 @@ Symbol definitions are lifted verbatim from the installed KiCad 9 libraries and
 pin coordinates are read from them, so every wire endpoint is computed rather
 than guessed.  Nets are made with labels on short stubs - a netlist-style
 schematic that passes ERC without hand-routing.
+
+REQUIRES KICAD, AND KICAD IS NO LONGER INSTALLED HERE.  The KiCad project was
+removed from the repo on 2026-08-21; this script will fail at SYMDIR below until
+KiCad 9 is reinstalled.  It is kept because the component and net declarations
+near the bottom are the circuit definition of record - the most precise
+description of the design in this repo, readable whether or not it can run.
+solar_node.net is what it last produced, and solar_node.pdf/.svg render it.
+
+Out of date as of 2026-08-21: design note 9 adds the USB feed D3 with its 22 ohm
+inrush limiter, and the regulator is now an HT7533 rather than the MCP1700 here.
+Neither change is reflected below.
 """
 import os, re, math, uuid as _uuid
 

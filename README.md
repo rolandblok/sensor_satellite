@@ -21,7 +21,7 @@ a refresh, and nothing at all while displaying.
 | ----- | ----- |
 | ESP8266 bench rig | done — [proto_oled_d1_mini.md](proto_oled_d1_mini.md) |
 | ESP32-C3 + BME280 + e-paper, USB powered | **current** — [proto_epaper_esp32c3.md](proto_epaper_esp32c3.md) |
-| Supercapacitor + solar | not started |
+| Supercapacitor + solar | **bench testing** — [solar_node.md](solar_node.md) |
 
 Working now: sensor reads validated, CSV logging over USB serial, e-paper
 driver initialising with the correct panel class. Not yet done: end-to-end
