@@ -194,7 +194,7 @@ static void drawFrame(bool ok, const Reading &r) {
   // right column
   const int16_t xr = W - 4;
   display.setFont(&FreeSans9pt7b);
-  snprintf(buf, sizeof(buf), "%.0f %%RH", r.rh);      drawRight(buf, xr, 44);
+  snprintf(buf, sizeof(buf), "%.0f %% RH", r.rh);     drawRight(buf, xr, 44);
   snprintf(buf, sizeof(buf), "%.0f hPa", r.hPaSea);   drawRight(buf, xr, 66);
   snprintf(buf, sizeof(buf), "dew %.1f C", r.dewC);   drawRight(buf, xr, 88);
 
