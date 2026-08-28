@@ -19,21 +19,23 @@ now; solar and supercapacitor are a later stage.
 ```
                  ESP32-C3 SuperMini
                  ------------------
-  BME280  SDA ---- GPIO0                GPIO3 ---- DC    e-paper
+  BME280  SDA ---- GPIO0               GPIO21 ---- DC    e-paper
           SCL ---- GPIO1                GPIO4 ---- CLK
           VIN ---- 3V3                  GPIO5 ---- RST
           GND ---- GND                  GPIO6 ---- DIN
                                         GPIO7 ---- CS
-                                       GPIO10 ---- BUSY
-                                          3V3 ---- VCC
-                                          GND ---- GND
+  Vcap    tap ---- GPIO3                GPIO10 --- BUSY
+  divider GND ---- GND                     3V3 ---- VCC
+                                           GND ---- GND
 ```
 
 | Device | Signal | C3 pin |
 | ------ | ------ | ------ |
 | BME280 | SDA | GPIO0 |
 | BME280 | SCL | GPIO1 |
-| e-paper | DC | GPIO3 |
+| Vcap divider | VSENSE tap | GPIO3 |
+| Logger | UART TX out | GPIO20 |
+| e-paper | DC | GPIO21 |
 | e-paper | CLK | GPIO4 |
 | e-paper | RST | GPIO5 |
 | e-paper | DIN | GPIO6 |
@@ -47,19 +49,34 @@ and data lines — it is not 5 V tolerant.
 
 ```
 GPIO0, GPIO1    I2C      BME280
-GPIO3..GPIO7    SPI      e-paper DC, CLK, RST, DIN, CS
+GPIO3           ADC      supercapacitor divider tap
+GPIO4..GPIO7    SPI      e-paper CLK, RST, DIN, CS
 GPIO10          input    e-paper BUSY
-GPIO2           free     reserved for the supercapacitor divider
-GPIO8, GPIO9    avoid    strapping pins
+GPIO21          output   e-paper DC
+GPIO2           unused   strapping pin - deliberately left open
+GPIO8, GPIO9    free     strapping pins, usable with care
 GPIO18, GPIO19  avoid    USB
-GPIO20, GPIO21  avoid    UART0
+GPIO20          UART TX  log mirror to the witness logger
 ```
 
-The board is full. GPIO2 is the only pin left and the only unspent ADC1
-channel, so it is reserved for supercapacitor voltage sensing. It is a
-strapping pin that must not be low at boot, which is acceptable here: the node
-can only boot when the cap holds charge, so a divider on it necessarily reads
-high at that moment. Use a 100 kΩ series resistor.
+The board is effectively full. The supercapacitor divider needs an ADC1
+channel, and ADC1 on the C3 is GPIO0–GPIO4 only: GPIO0/GPIO1 are the I²C bus
+and GPIO4 is the SPI clock, which leaves GPIO2 and GPIO3.
+
+**It has to be GPIO3.** GPIO2 is a strapping pin that must be high at reset,
+and a divider on it holds it at Vcap ÷ 2 — so a flat cap holds it at 0 V and
+the board will not boot at all. That presents as a dead board, not as a bad
+reading, and bench runs start from a flat cap. GPIO2 is left unconnected.
+
+Freeing GPIO3 pushes e-paper DC to GPIO21. That is safe: `Serial` is USB-CDC on
+GPIO18/GPIO19, so UART0 is never initialised and GPIO20/GPIO21 are ordinary
+GPIO. The ROM bootloader still prints its boot log on GPIO21, so DC wiggles for
+a few milliseconds at reset — harmless, since GxEPD2 hardware-resets the panel
+inside `init()` well after that, but it is why CS and RST stay where they are.
+
+The divider is **1 MΩ / 1 MΩ with 100 nF at the tap**: ÷2, 2.3 µA at 4.6 V, and
+50 ms settling. 100 kΩ / 100 kΩ would bleed 27 µA, comparable to the entire
+sleep budget.
 
 Anything added later should go on the existing I²C bus, which costs no pins —
 BH1750 (`0x23`) for lux is the obvious candidate.
@@ -147,7 +164,12 @@ Unified Sensor**.
 | `ALTITUDE_M` | `17.0` | Eindhoven, ~17 m AMSL — for sea-level pressure |
 | `MIN_REFRESH_C` | `0.0` | below this the panel is skipped, image kept |
 | `USE_DEEP_SLEEP` | `0` | 1 = sleep between cycles |
-| `FORCE_SDA` / `FORCE_SCL` | `-1` | pin the I²C bus instead of auto-detecting |
+| `FORCE_SDA` / `FORCE_SCL` | `0` / `1` | I²C pinned; set both to `-1` to auto-detect again |
+| `VSENSE_PIN` | `3` | supercapacitor divider tap |
+| `VDIV_NUM` | `2.0` | divider ratio, `(R3+R4)/R4` |
+| `VDIV_CAL` | `1.0149` | calibration, meter ÷ reported — fitted 2026-08-28 |
+| `LOG_TX_PIN` | `20` | UART mirror of the log, for cap runs with USB out |
+| `LOG_BAUD` | `115200` | must match the logger sketch |
 
 Check the back of the panel for a **`V2` sticker** and set `PANEL_V2` to match.
 V1 and V2 are pin-compatible; only the driver class differs. A wrong class gives
@@ -155,8 +177,12 @@ a blank, mirrored, or garbled screen and nothing worse.
 
 Behaviour:
 
-* **Auto-detects the I²C bus.** Sweeps every SDA/SCL pair on GPIO0–10 for
-  `0x76`/`0x77` at startup, so rewiring the sensor needs no code change.
+* **I²C bus is pinned.** `FORCE_SDA`/`FORCE_SCL` hold it at GPIO0/GPIO1. The
+  auto-detect sweep is still there behind `-1`, but it probes GPIO0–10 and would
+  drive the VSENSE tap as a bus line, so GPIO3 is excluded from the sweep list.
+* **Reads Vcap in millivolts.** `analogReadMilliVolts()` averaged over 32
+  samples, not raw counts — the efuse ADC calibration is doing real work at
+  these levels. Reported as a `Vcap_V` column and on the panel header.
 * **Logs CSV.** `#` comments, plain data lines — pastes into a spreadsheet.
 * **No `<WiFi.h>`.** This node never uses WiFi or BLE. The Arduino core does not
   power the RF PHY until something calls `WiFi.*`, so not touching it leaves both
@@ -164,7 +190,7 @@ Behaviour:
   whole stack — 985 KB flash versus 340 KB — for identical power behaviour. Add
   the explicit shutdown only if a library is introduced that starts the radio.
 
-Build size: **27% flash, 5% RAM**.
+Build size: **28% flash, 5% RAM**.
 
 ### Build and flash
 
@@ -185,11 +211,14 @@ The Arduino IDE bundles `arduino-cli` at
 # I2C bus: SDA=GPIO0 SCL=GPIO1
 # sensor ID 0x60 at 0x76  (BME280, has humidity)
 # e-paper 296x128 ready (V2 / SSD1680)
-# t_s,T_C,RH_pct,dew_C,P_station_hPa,P_sea_hPa,Tmin_C,Tmax_C
-0.5,26.11,38.0,10.7,1017.63,1019.08,26.1,26.1
-2.6,26.01,37.7,10.5,1017.68,1019.12,26.0,26.1
-4.6,26.01,38.1,10.6,1017.62,1019.07,26.0,26.1
+# Vcap sense: GPIO3, divider x2.00, cal 1.015 -> 4.819 V now
+# t_s,T_C,RH_pct,dew_C,P_station_hPa,P_sea_hPa,Tmin_C,Tmax_C,Vcap_V
+0.5,24.64,52.7,14.3,1007.64,1009.67,24.6,24.6,4.817
 ```
+
+Captured on the rewired board, 2026-08-28, with `VDIV_CAL` fitted — a DMM on the
+cap read 4.81 V at the same moment. Every line above is also mirrored out GPIO20
+to the witness logger; see [solar_node.md](solar_node.md).
 
 ### Display layout
 
@@ -197,7 +226,7 @@ The Arduino IDE bundles `arduino-cli` at
 
 ```
 +--------------------------------------------------+
-| sensor satellite                             #42 |
+| sensor satellite                   4.21 V    #42 |
 |--------------------------------------------------|
 |                                       56 % RH    |
 |   21.8 C                             1019 hPa    |
@@ -207,8 +236,10 @@ The Arduino IDE bundles `arduino-cli` at
 +--------------------------------------------------+
 ```
 
-`#42` is the boot counter; min/max is the temperature range. Both live in RTC
-memory, which survives deep sleep. That is also the mechanism partial refresh
+`4.21 V` is the supercapacitor voltage and `#42` the boot counter; min/max is
+the temperature range. Vcap sits in the header rather than the footer so it is
+drawn before the no-sensor early return — a BME280 fault still shows the cap
+voltage. Boot count and min/max live in RTC memory, which survives deep sleep. That is also the mechanism partial refresh
 will need: the previous frame's state must persist to redraw only what changed.
 
 ---
@@ -296,4 +327,4 @@ SuperMini's regulator quiescent current is what raises it.
 ## Next
 
 Supercapacitor and solar. Carry forward: the measured currents above, and the
-GPIO2 ADC channel held in reserve for the cap voltage divider.
+GPIO3 ADC channel now carrying the cap voltage divider.

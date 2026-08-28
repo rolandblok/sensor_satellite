@@ -25,17 +25,36 @@
 #define MIN_REFRESH_C   0.0f   // below this the panel is skipped, image is kept
 
 // e-paper pins (SPI). DIN/CLK/CS are the C3's native FSPI pins.
+// DC is on GPIO21, not GPIO3: GPIO3 is the only ADC1 channel left for VSENSE.
+// GPIO21 is UART0 TX, free here because Serial is USB-CDC on GPIO18/19.
 #define EPD_CS    7
-#define EPD_DC    3
+#define EPD_DC    21
 #define EPD_RST   5
 #define EPD_BUSY  10
 #define EPD_SCK   4
 #define EPD_MOSI  6
 #define EPD_MISO  -1           // MUST be -1: the default MISO is GPIO5, used by RST
 
-// I2C bus is auto-detected. Set these to force fixed pins instead.
-#define FORCE_SDA -1
-#define FORCE_SCL -1
+// UART mirror of the log. Serial is native USB-CDC and disappears the moment
+// USB is unplugged - which is exactly when the node runs from the cap. GPIO20 is
+// U0RXD, free because Serial is USB-CDC, and is used here as UART0 TX. A
+// listener board on the other end keeps the log alive - see logger_d1_mini/.
+#define LOG_TX_PIN 20
+#define LOG_BAUD   115200
+
+// I2C bus. Pinned, not auto-detected: the sweep probes GPIO0..10 and would
+// otherwise drive the VSENSE pin as a bus line. Set both to -1 to sweep again.
+#define FORCE_SDA 0
+#define FORCE_SCL 1
+
+// Supercapacitor sense. 1 Mohm / 1 Mohm divider with 100 nF at the tap, on the
+// one ADC1 channel this build has spare. GPIO2 would have been the obvious pin
+// and is wrong: it is a strapping pin that must be high at reset, and a divider
+// on it holds it low whenever the cap is flat - a dead board, not a bad reading.
+#define VSENSE_PIN 3
+#define VDIV_NUM   2.0f    // (R3+R4)/R4
+#define VDIV_CAL   1.0149f // 2026-08-28: DMM 4.81 V vs 4.7962 V, mean of 5 boots
+                           // (spread 4.782-4.811, so this is good to ~0.3%)
 
 #if PANEL_V2
   #define EPD_CLASS GxEPD2_290_T94_V2
@@ -61,11 +80,26 @@ static bool    bmeOk  = false;
 // generated prototypes there, and they reference this type.
 struct Reading {
   float tC, rh, hPa, hPaSea, dewC;
+  float vcap;
 };
 
+// ---------------- logging ----------------
+// Everything goes to both ports. Cheap insurance: a line that only reaches USB
+// is a line that does not exist during a cap run.
+static void logBoth(const char *fmt, ...) {
+  char buf[192];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+  Serial.print(buf);
+  Serial0.print(buf);
+}
+
 // ---------------- bus discovery ----------------
-// GPIO18/19 are USB, GPIO20/21 are UART0 - leave them alone.
-static const uint8_t PINS[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+// GPIO18/19 are USB, GPIO20 is the log mirror, GPIO21 is e-paper DC.
+// GPIO3 is excluded too: driving the VSENSE tap as a bus line fights the divider.
+static const uint8_t PINS[] = {0, 1, 2, 4, 5, 6, 7, 8, 9, 10};
 static const uint8_t NPINS  = sizeof(PINS) / sizeof(PINS[0]);
 
 static bool probe(uint8_t addr) {
@@ -86,7 +120,13 @@ static bool startBus(int8_t sda, int8_t scl) {
 static bool findBus() {
   if (FORCE_SDA >= 0 && FORCE_SCL >= 0) {
     sdaPin = FORCE_SDA; sclPin = FORCE_SCL;
-    return startBus(sdaPin, sclPin);
+    if (!startBus(sdaPin, sclPin)) return false;
+    // Still probe: bmeAddr is what begin() needs, and pinning the pins says
+    // nothing about which of the two addresses the SDO strap selected.
+    for (uint8_t a = 0x76; a <= 0x77; a++) {
+      if (probe(a)) { bmeAddr = a; return true; }
+    }
+    return false;
   }
   for (uint8_t i = 0; i < NPINS; i++) {
     for (uint8_t j = 0; j < NPINS; j++) {
@@ -106,14 +146,14 @@ static bool findBus() {
 // ---------------- sensor ----------------
 static bool bmeBegin() {
   if (!bme.begin(bmeAddr, &Wire)) {
-    Serial.printf("# BME280 found at 0x%02X but begin() failed\n", bmeAddr);
+    logBoth("# BME280 found at 0x%02X but begin() failed\n", bmeAddr);
     return false;
   }
   uint8_t id = bme.sensorID();
-  Serial.printf("# sensor ID 0x%02X at 0x%02X", id, bmeAddr);
-  if      (id == 0x60) Serial.println("  (BME280, has humidity)");
-  else if (id == 0x58) Serial.println("  (BMP280 - NO humidity, RH is fiction)");
-  else                 Serial.println("  (unrecognised)");
+  logBoth("# sensor ID 0x%02X at 0x%02X", id, bmeAddr);
+  if      (id == 0x60) logBoth("  (BME280, has humidity)\n");
+  else if (id == 0x58) logBoth("  (BMP280 - NO humidity, RH is fiction)\n");
+  else                 logBoth("  (unrecognised)\n");
 
   // Bosch "weather monitoring" profile: one forced conversion per cycle,
   // no oversampling, no filter. Avoids the self-heating of normal mode.
@@ -147,6 +187,20 @@ static bool bmeRead(Reading &r) {
   return true;
 }
 
+// ---------------- supercap sense ----------------
+// Millivolts, not raw counts: the C3's efuse ADC calibration is doing real work
+// at these levels. 12 dB attenuation is calibrated to roughly 2.5 V at the pin,
+// so the tap is trustworthy to about Vcap 4.8 V and compresses above it - read
+// anything higher as "high", not as a number. The first conversion after a
+// pin/attenuation change is unsettled, so it is discarded.
+static float readVcap() {
+  analogSetPinAttenuation(VSENSE_PIN, ADC_11db);   // 3.x alias for ADC_ATTEN_DB_12
+  (void)analogReadMilliVolts(VSENSE_PIN);
+  uint32_t acc = 0;
+  for (int i = 0; i < 32; i++) acc += analogReadMilliVolts(VSENSE_PIN);
+  return acc / 32.0f * VDIV_NUM * VDIV_CAL / 1000.0f;
+}
+
 // ---------------- display ----------------
 static void drawRight(const char *s, int16_t xRight, int16_t y) {
   int16_t bx, by; uint16_t bw, bh;
@@ -167,7 +221,7 @@ static void drawFrame(bool ok, const Reading &r) {
   display.setFont(&FreeSans9pt7b);
   display.setCursor(4, 15);
   display.print("sensor satellite");
-  snprintf(buf, sizeof(buf), "#%lu", (unsigned long)bootCount);
+  snprintf(buf, sizeof(buf), "%.2f V   #%lu", r.vcap, (unsigned long)bootCount);
   drawRight(buf, W - 4, 15);
   display.drawFastHLine(0, 21, W, GxEPD_BLACK);
 
@@ -217,19 +271,20 @@ static void refresh(bool ok, const Reading &r) {
 
 // ---------------- logging ----------------
 static void logHeader() {
-  Serial.println("# t_s,T_C,RH_pct,dew_C,P_station_hPa,P_sea_hPa,Tmin_C,Tmax_C");
+  logBoth("# t_s,T_C,RH_pct,dew_C,P_station_hPa,P_sea_hPa,Tmin_C,Tmax_C,Vcap_V\n");
 }
 
 static void logReading(const Reading &r) {
-  Serial.printf("%.1f,%.2f,%.1f,%.1f,%.2f,%.2f,%.1f,%.1f\n",
+  logBoth("%.1f,%.2f,%.1f,%.1f,%.2f,%.2f,%.1f,%.1f,%.3f\n",
                 millis() / 1000.0f,
-                r.tC, r.rh, r.dewC, r.hPa, r.hPaSea, tMin, tMax);
+                r.tC, r.rh, r.dewC, r.hPa, r.hPaSea, tMin, tMax, r.vcap);
 }
 
 static void runCycle() {
   Reading r = {};
+  r.vcap = readVcap();          // before the sensor: valid even on a read failure
   if (!bmeRead(r)) {
-    Serial.println("# BME280 read failed - showing fault frame");
+    logBoth("# BME280 read failed - showing fault frame (Vcap %.3f V)\n", r.vcap);
     refresh(false, r);
     return;
   }
@@ -241,7 +296,7 @@ static void runCycle() {
   // E-paper refresh is unreliable below freezing. The panel is bistable, so
   // keeping the previous image costs nothing but staleness.
   if (r.tC < MIN_REFRESH_C) {
-    Serial.printf("# %.1f C below %.1f C - skipping refresh, keeping last image\n",
+    logBoth("# %.1f C below %.1f C - skipping refresh, keeping last image\n",
                   r.tC, MIN_REFRESH_C);
     return;
   }
@@ -250,19 +305,23 @@ static void runCycle() {
 
 void setup() {
   Serial.begin(115200);
+  // UART0 TX remapped to GPIO20. Must come before display.init(): UART0's
+  // default TX is GPIO21, and init()'s pinMode() on DC is what takes GPIO21
+  // back off the UART matrix afterwards.
+  Serial0.begin(LOG_BAUD, SERIAL_8N1, -1, LOG_TX_PIN);
   delay(300);                  // let USB-CDC enumerate before the first print
   bootCount++;
-  Serial.printf("\n# proto_epaper_esp32c3  boot #%lu\n", (unsigned long)bootCount);
-  Serial.println("# radios never initialised - WiFi and BLE PHY unpowered");
+  logBoth("\n# proto_epaper_esp32c3  boot #%lu\n", (unsigned long)bootCount);
+  logBoth("# radios never initialised - WiFi and BLE PHY unpowered\n");
 
   // Sensor first, but never fatal: the display must come up either way so a
   // fault is visible on the panel rather than only on a serial port nobody is
   // watching.
   if (findBus()) {
-    Serial.printf("# I2C bus: SDA=GPIO%d SCL=GPIO%d\n", sdaPin, sclPin);
+    logBoth("# I2C bus: SDA=GPIO%d SCL=GPIO%d\n", sdaPin, sclPin);
     bmeOk = bmeBegin();
   } else {
-    Serial.println("# no BME280 on any pin pair - check CSB/SDO strapping and power");
+    logBoth("# no BME280 on any pin pair - check CSB/SDO strapping and power\n");
   }
 
   display.init(115200, true, 2, false);
@@ -271,15 +330,19 @@ void setup() {
   SPI.end();
   SPI.begin(EPD_SCK, EPD_MISO, EPD_MOSI, EPD_CS);
   display.setRotation(1);      // landscape, 296x128
-  Serial.printf("# e-paper %dx%d ready (%s)\n", display.width(), display.height(),
+  logBoth("# e-paper %dx%d ready (%s)\n", display.width(), display.height(),
                 PANEL_V2 ? "V2 / SSD1680" : "V1 / IL3820");
+
+  logBoth("# Vcap sense: GPIO%d, divider x%.2f, cal %.3f -> %.3f V now\n",
+                VSENSE_PIN, VDIV_NUM, VDIV_CAL, readVcap());
 
   logHeader();
 
 #if USE_DEEP_SLEEP
   runCycle();
-  Serial.printf("# sleeping %d s\n", CYCLE_S);
+  logBoth("# sleeping %d s\n", CYCLE_S);
   Serial.flush();
+  Serial0.flush();
   esp_sleep_enable_timer_wakeup((uint64_t)CYCLE_S * 1000000ULL);
   esp_deep_sleep_start();      // does not return; setup() runs again on wake
 #endif

@@ -43,25 +43,28 @@ refresh on the physical panel, current measurements, deep sleep.
 ```
                  ESP32-C3 SuperMini
                  ------------------
-  BME280  SDA ---- GPIO0                GPIO3 ---- DC    e-paper
+  BME280  SDA ---- GPIO0               GPIO21 ---- DC    e-paper
           SCL ---- GPIO1                GPIO4 ---- CLK
           VIN ---- 3V3                  GPIO5 ---- RST
           GND ---- GND                  GPIO6 ---- DIN
                                         GPIO7 ---- CS
-                                       GPIO10 ---- BUSY
-                                          3V3 ---- VCC
-                                          GND ---- GND
+  Vcap    tap ---- GPIO3                GPIO10 --- BUSY
+  divider GND ---- GND                     3V3 ---- VCC
+                                           GND ---- GND
 ```
 
-Full pin budget, module strapping (BME280 `CSB`/`SDO`, e-paper `BS`) and the
-board-specific gotchas are in
+DC is on GPIO21, not GPIO3: GPIO3 is the one ADC1 channel left for the
+supercapacitor divider, and GPIO2 — the obvious alternative — is a strapping pin
+that a divider would hold low on a flat cap. Full pinout in
+[gpio.md](gpio.md); pin budget, module strapping (BME280 `CSB`/`SDO`, e-paper
+`BS`) and board gotchas in
 [proto_epaper_esp32c3.md](proto_epaper_esp32c3.md).
 
 ## Layout
 
 ```
 +--------------------------------------------------+
-| sensor satellite                             #42 |
+| sensor satellite                   4.21 V    #42 |
 |--------------------------------------------------|
 |                                       56 % RH    |
 |   21.8 C                             1019 hPa    |
@@ -92,6 +95,8 @@ arduino-cli compile --upload -p COM5 \
 | [`proto_epaper_esp32c3/`](proto_epaper_esp32c3/) | current firmware — BME280 + e-paper |
 | [`proto_oled_esp32c3/`](proto_oled_esp32c3/) | sensor-only build, serial logging, no display |
 | [`i2c_scan/`](i2c_scan/) | I²C scanner; sweeps every pin pair to find the bus |
+| [`logger_d1_mini/`](logger_d1_mini/) | D1 mini witness logger — keeps the log alive on cap power |
+| [`gpio.md`](gpio.md) | ESP32-C3 SuperMini pinout and this build's pin map |
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |
 | [`proto_oled_d1_mini.md`](proto_oled_d1_mini.md) | earlier ESP8266 bench rig and its power analysis |

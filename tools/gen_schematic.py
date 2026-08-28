@@ -10,11 +10,17 @@ removed from the repo on 2026-08-21; this script will fail at SYMDIR below until
 KiCad 9 is reinstalled.  It is kept because the component and net declarations
 near the bottom are the circuit definition of record - the most precise
 description of the design in this repo, readable whether or not it can run.
-solar_node.net is what it last produced, and solar_node.pdf/.svg render it.
+solar_node.pdf/.svg render what it last produced.  The exported netlist
+solar_node.net was removed on 2026-08-28.
 
 Out of date as of 2026-08-21: design note 9 adds the USB feed D3 with its 22 ohm
 inrush limiter, and the regulator is now an HT7533 rather than the MCP1700 here.
 Neither change is reflected below.
+
+Pin assignments deliberately do not appear here: the ESP symbol's pins carry net
+names (VSENSE, EPD_DC, SDA, ...), so the 2026-08-28 move of the sense tap to
+GPIO3 and e-paper DC to GPIO21 leaves this file correct.  gpio.md holds the
+net-name-to-GPIO mapping.
 """
 import os, re, math, uuid as _uuid
 

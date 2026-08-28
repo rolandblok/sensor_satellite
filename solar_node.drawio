@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram name="Solar sensor node" id="solar-node">
-        <mxGraphModel dx="1513" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1150" math="0" shadow="0">
+        <mxGraphModel dx="1350" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1150" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -11,7 +11,7 @@
                     <mxGeometry x="50" y="66" width="900" height="24" as="geometry"/>
                 </mxCell>
                 <mxCell id="zone_harvest" value="HARVEST" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=11;fontColor=#7f6000;fontStyle=1;" parent="1" vertex="1">
-                    <mxGeometry x="50" y="120" width="330" height="330" as="geometry"/>
+                    <mxGeometry x="50" y="120" width="330" height="440" as="geometry"/>
                 </mxCell>
                 <mxCell id="zone_store" value="STORE &amp; PROTECT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=11;fontColor=#1f4e79;fontStyle=1;" parent="1" vertex="1">
                     <mxGeometry x="410" y="120" width="300" height="640" as="geometry"/>
@@ -41,7 +41,7 @@
                     <mxGeometry x="250" y="245" width="230" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="parallel_note" value="&lt;b&gt;PARALLEL&lt;/b&gt; — not series.&lt;br&gt;Series would give ~12 V and&lt;br&gt;destroy the 5.5 V cap.&lt;br&gt;Separate diodes stop a shaded&lt;br&gt;panel sinking the other&#39;s current." style="text;html=1;fontSize=11;align=left;verticalAlign=top;fontColor=#7f6000;" parent="1" vertex="1">
-                    <mxGeometry x="80" y="270" width="200" height="50" as="geometry"/>
+                    <mxGeometry x="80" y="410" width="200" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="railtop" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" parent="1" vertex="1">
                     <mxGeometry x="546" y="196" width="8" height="8" as="geometry"/>
@@ -58,7 +58,7 @@
                 <mxCell id="balance" value="&lt;b&gt;CELL BALANCING&lt;/b&gt;&lt;br&gt;2 x 100 kΩ across each cell&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;skip only if the module&lt;br&gt;already has them fitted&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;dashed=1;" parent="1" vertex="1">
                     <mxGeometry x="440" y="500" width="220" height="80" as="geometry"/>
                 </mxCell>
-                <mxCell id="divider" value="&lt;b&gt;VCAP SENSE&lt;/b&gt;&lt;br&gt;1 MΩ / 1 MΩ + 100 nF&lt;br&gt;→ GPIO2 (ADC1)&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;2.7 µA bleed&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
+                <mxCell id="divider" value="&lt;b&gt;VCAP SENSE&lt;/b&gt;&lt;br&gt;1 MΩ / 1 MΩ + 100 nF&lt;br&gt;→ GPIO3 (ADC1)&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;2.3 µA at 4.6 V&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
                     <mxGeometry x="440" y="620" width="220" height="90" as="geometry"/>
                 </mxCell>
                 <mxCell id="ldo" value="&lt;b&gt;LOW-Iq LDO&lt;/b&gt;&lt;br&gt;3.3 V out&lt;br&gt;MCP1700 / TPS7A02&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Iq ≤ 2 µA, dropout &lt; 200 mV&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
@@ -67,7 +67,7 @@
                 <mxCell id="rail3v3" value="&lt;b&gt;3V3 rail&lt;/b&gt;" style="text;html=1;fontSize=12;align=left;fontColor=#255d1c;" parent="1" vertex="1">
                     <mxGeometry x="1010" y="200" width="100" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="esp" value="&lt;b&gt;ESP32-C3 SuperMini&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;GPIO0  SDA  → BME280&lt;br&gt;GPIO1  SCL  → BME280&lt;br&gt;GPIO2  ADC  ← Vcap&lt;br&gt;GPIO3  DC   → e-paper&lt;br&gt;GPIO4  CLK  → e-paper&lt;br&gt;GPIO5  RST  → e-paper&lt;br&gt;GPIO6  DIN  → e-paper&lt;br&gt;GPIO7  CS   → e-paper&lt;br&gt;GPIO10 BUSY ← e-paper&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;radios never initialised&lt;br&gt;deep sleep between cycles&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;verticalAlign=top;spacingTop=8;" parent="1" vertex="1">
+                <mxCell id="esp" value="&lt;b&gt;ESP32-C3 SuperMini&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;GPIO0  SDA  → BME280&lt;br&gt;GPIO1  SCL  → BME280&lt;br&gt;GPIO3  ADC  ← VSENSE&lt;br&gt;GPIO4  CLK  → e-paper&lt;br&gt;GPIO5  RST  → e-paper&lt;br&gt;GPIO6  DIN  → e-paper&lt;br&gt;GPIO7  CS   → e-paper&lt;br&gt;GPIO10 BUSY ← e-paper&lt;br&gt;GPIO21 DC   → e-paper&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;radios never initialised&lt;br&gt;deep sleep between cycles&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;verticalAlign=top;spacingTop=8;" parent="1" vertex="1">
                     <mxGeometry x="780" y="330" width="290" height="290" as="geometry"/>
                 </mxCell>
                 <mxCell id="bme" value="&lt;b&gt;BME280&lt;/b&gt;&lt;br&gt;I²C @ 0x76&lt;br&gt;T / RH / pressure&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;forced mode, ~0 µA avg&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
@@ -123,7 +123,7 @@
                 <mxCell id="e_div_esp" value="ADC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=block;dashed=1;fontSize=11;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.9;entryDx=0;entryDy=0;" parent="1" source="divider" target="esp" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="notes" value="&lt;b&gt;DESIGN NOTES&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;1. Panels in parallel.&lt;/b&gt; Two 5 V panels in series give ~12 V and would destroy a 5.5 V cap.&lt;br&gt;Parallel keeps the voltage and doubles the current: 400 mA in full sun.&lt;br&gt;&lt;br&gt;&lt;b&gt;2. One diode per panel.&lt;/b&gt; D1/D2 block night-time discharge back into the panels &lt;i&gt;and&lt;/i&gt;&lt;br&gt;stop a shaded panel from sinking current from the lit one. A single shared diode does not.&lt;br&gt;&lt;br&gt;&lt;b&gt;3. The clamp is not optional.&lt;/b&gt; A &quot;5 V&quot; panel reaches ~6.5 V open-circuit in bright sun.&lt;br&gt;The cap is rated 5.5 V absolute. Without a shunt clamp, a sunny afternoon with the node&lt;br&gt;asleep will overvolt it.&lt;br&gt;&lt;br&gt;&lt;b&gt;4. Usable energy is charge, not ½CV².&lt;/b&gt; The LDO drops out around 3.6 V, so only&lt;br&gt;4 F x (4.6 - 3.6) = 4 C is usable — about 13 J at 3.3 V, not the 60 J the raw cap figure suggests.&lt;br&gt;&lt;br&gt;&lt;b&gt;5. Sense divider must be high impedance.&lt;/b&gt; 100 k/100 k bleeds 27 µA — comparable to the&lt;br&gt;whole sleep budget. 1 M/1 M bleeds 2.7 µA; add 100 nF at the tap for the ADC to charge from.&lt;br&gt;&lt;br&gt;&lt;b&gt;6. Charging is fast, harvesting is not.&lt;/b&gt; 4 C at 400 mA is ~10 s of full sun. The design&lt;br&gt;constraint is overcast days and winter, not charge time." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#999999;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="1" vertex="1">
+                <mxCell id="notes" value="&lt;b&gt;DESIGN NOTES&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;1. Panels in parallel.&lt;/b&gt; Two 5 V panels in series give ~12 V and would destroy a 5.5 V cap.&lt;br&gt;Parallel keeps the voltage and doubles the current: 400 mA in full sun.&lt;br&gt;&lt;br&gt;&lt;b&gt;2. One diode per panel.&lt;/b&gt; D1/D2 block night-time discharge back into the panels &lt;i&gt;and&lt;/i&gt;&lt;br&gt;stop a shaded panel from sinking current from the lit one. A single shared diode does not.&lt;br&gt;&lt;br&gt;&lt;b&gt;3. The clamp is not optional.&lt;/b&gt; A &quot;5 V&quot; panel reaches ~6.5 V open-circuit in bright sun.&lt;br&gt;The cap is rated 5.5 V absolute. Without a shunt clamp, a sunny afternoon with the node&lt;br&gt;asleep will overvolt it.&lt;br&gt;&lt;br&gt;&lt;b&gt;4. Usable energy is charge, not ½CV².&lt;/b&gt; The LDO drops out around 3.6 V, so only&lt;br&gt;4 F x (4.6 - 3.6) = 4 C is usable — about 13 J at 3.3 V, not the 60 J the raw cap figure suggests.&lt;br&gt;&lt;br&gt;&lt;b&gt;5. Sense divider must be high impedance.&lt;/b&gt; 100 k/100 k bleeds 27 µA — comparable to the&lt;br&gt;whole sleep budget. 1 M/1 M bleeds 2.3 µA at 4.6 V; add 100 nF at the tap for the ADC to charge from.&lt;br&gt;&lt;br&gt;&lt;b&gt;6. Charging is fast, harvesting is not.&lt;/b&gt; 4 C at 400 mA is ~10 s of full sun. The design&lt;br&gt;constraint is overcast days and winter, not charge time." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#999999;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="1" vertex="1">
                     <mxGeometry x="80" y="860" width="1320" height="370" as="geometry"/>
                 </mxCell>
                 <mxCell id="todo" value="&lt;b&gt;MEASURE FIRST&lt;/b&gt;&lt;br&gt;Active current, sleep current and refresh&lt;br&gt;energy are still unmeasured. They decide&lt;br&gt;whether one panel is enough — and whether&lt;br&gt;4 F is too small.&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;Do not order parts from this drawing yet.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" parent="1" vertex="1">
@@ -133,7 +133,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="BENCH TEST — 2 panels" id="bench-test">
-        <mxGraphModel dx="774" dy="536" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+        <mxGraphModel dx="1350" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
             <root>
                 <mxCell id="b0"/>
                 <mxCell id="b1" parent="b0"/>
@@ -459,6 +459,245 @@
                 </mxCell>
                 <mxCell id="cn_never" value="&lt;b&gt;NEVER&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;Short a charged supercap.&lt;/b&gt; 4 F at 4.8 V is 46 J and tens of amps — it welds tweezers, vaporises thin wire and wrecks the cap. To empty it, hang a &lt;b&gt;100 Ω 2 W&lt;/b&gt; resistor across it and wait ~20 min. Never a screwdriver, never a wire link.&lt;br&gt;&lt;b&gt;Probe with the meter still in current mode.&lt;/b&gt; Leads left in the A jacks and touched across the cap is a dead short through the meter&#39;s shunt — blown fuse at best, and the cap can deliver far more than the fuse rating. Glance at the jacks before every probe.&lt;br&gt;&lt;b&gt;Leave the panels connected during a leakage or discharge test.&lt;/b&gt; You would be measuring charge minus drain, not either one. That is what the removable link is for." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="c1" vertex="1">
                     <mxGeometry x="80" y="1030" width="1420" height="140" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="BENCH TEST — ESP reads Vcap" id="bench-adc">
+        <mxGraphModel dx="1513" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1480" math="0" shadow="0">
+            <root>
+                <mxCell id="a0"/>
+                <mxCell id="a1" parent="a0"/>
+                <mxCell id="atitle" value="BENCH TEST — the ESP reads Vcap, on USB power" style="text;html=1;fontSize=24;fontStyle=1;align=left;verticalAlign=middle;" parent="a1" vertex="1">
+                    <mxGeometry x="50" y="25" width="1100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="asub" value="Stage 3. The power chain stays a separate circuit. The ESP runs on USB and only listens — one sense wire and one ground wire between them." style="text;html=1;fontSize=13;fontColor=#666666;align=left;verticalAlign=middle;" parent="a1" vertex="1">
+                    <mxGeometry x="50" y="60" width="1200" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="arule" value="&lt;b&gt;THE RULE&lt;/b&gt;&amp;nbsp;&amp;nbsp; Two circuits, joined at exactly &lt;b&gt;two&lt;/b&gt; points: the &lt;b&gt;sense tap&lt;/b&gt; and &lt;b&gt;GND&lt;/b&gt;.&amp;nbsp;&amp;nbsp; The HT7533 output feeds the dummy load or nothing at all — on this sheet it &lt;b&gt;never&lt;/b&gt; touches the SuperMini&#39;s 3V3 pin." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;align=left;spacingLeft=16;" parent="a1" vertex="1">
+                    <mxGeometry x="50" y="100" width="1450" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="asep1" value="&lt;b&gt;CIRCUIT A — power chain, no MCU in it&lt;/b&gt;" style="text;html=1;fontSize=13;fontStyle=1;align=left;fontColor=#6c8ebf;" parent="a1" vertex="1">
+                    <mxGeometry x="60" y="180" width="400" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="asep2" value="&lt;b&gt;CIRCUIT B — MCU, USB powered&lt;/b&gt;" style="text;html=1;fontSize=13;fontStyle=1;align=left;fontColor=#82b366;" parent="a1" vertex="1">
+                    <mxGeometry x="980" y="180" width="400" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="apanels" value="&lt;b&gt;PANELS + D1 / D2&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;stages 1-2, verified&lt;br&gt;4.8 V after the diodes&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="a1" vertex="1">
+                    <mxGeometry x="80" y="210" width="180" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_p_link" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#d79b00;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="260" y="250" as="sourcePoint"/>
+                        <mxPoint x="290" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="alink1" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" parent="a1" vertex="1">
+                    <mxGeometry x="290" y="245" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="alink2" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" parent="a1" vertex="1">
+                    <mxGeometry x="330" y="245" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_link" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#999999;endArrow=none;dashed=1;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="250" as="sourcePoint"/>
+                        <mxPoint x="330" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="alinklabel" value="&lt;b&gt;LINK&lt;/b&gt; — pull it for&lt;br&gt;the discharge run" style="text;html=1;fontSize=10;align=center;verticalAlign=top;fontColor=#b85450;" parent="a1" vertex="1">
+                    <mxGeometry x="268" y="198" width="130" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_link_bus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#d79b00;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="340" y="250" as="sourcePoint"/>
+                        <mxPoint x="470" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="anode" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" parent="a1" vertex="1">
+                    <mxGeometry x="465" y="245" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="avcaplabel" value="&lt;b&gt;VCAP +&lt;/b&gt;" style="text;html=1;fontSize=13;align=center;fontColor=#1f4e79;" parent="a1" vertex="1">
+                    <mxGeometry x="410" y="215" width="120" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_bus_l" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="470" y="250" as="sourcePoint"/>
+                        <mxPoint x="160" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aw_bus_r" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="470" y="250" as="sourcePoint"/>
+                        <mxPoint x="740" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aw_bus_cap" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="470" y="250" as="sourcePoint"/>
+                        <mxPoint x="470" y="330" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="acap" value="&lt;b&gt;SUPERCAP&lt;/b&gt;&lt;br&gt;5.5 V / 4 F&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;marked lead up&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" parent="a1" vertex="1">
+                    <mxGeometry x="380" y="330" width="180" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_cap_gnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="470" y="440" as="sourcePoint"/>
+                        <mxPoint x="470" y="620" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aw_bus_ldo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="160" y="250" as="sourcePoint"/>
+                        <mxPoint x="160" y="330" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aldo" value="&lt;b&gt;HT7533&lt;/b&gt;&amp;nbsp; 3.3 V LDO&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;1 GND · 2 VIN · 3 VOUT&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;1 µF in · 1 µF out&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="a1" vertex="1">
+                    <mxGeometry x="70" y="330" width="180" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_ldo_load" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#82b366;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="160" y="410" as="sourcePoint"/>
+                        <mxPoint x="160" y="470" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aload" value="&lt;b&gt;DUMMY LOAD&lt;/b&gt;&lt;br&gt;130 Ω&amp;nbsp; 0.25 W&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;= 25.4 mA ≈ ESP active&lt;br&gt;or leave it off entirely&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;dashed=1;" parent="a1" vertex="1">
+                    <mxGeometry x="70" y="470" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_load_gnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="160" y="560" as="sourcePoint"/>
+                        <mxPoint x="160" y="620" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aw_ldognd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#000000;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="250" y="370" as="sourcePoint"/>
+                        <mxPoint x="310" y="620" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="310" y="370"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ar3" value="&lt;b&gt;R3&lt;/b&gt;&lt;br&gt;1 MΩ" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="a1" vertex="1">
+                    <mxGeometry x="700" y="290" width="80" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_r3_top" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="740" y="250" as="sourcePoint"/>
+                        <mxPoint x="740" y="290" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aw_r3_r4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="740" y="350" as="sourcePoint"/>
+                        <mxPoint x="740" y="450" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="atapnode" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" parent="a1" vertex="1">
+                    <mxGeometry x="735" y="385" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="ataplabel" value="&lt;b&gt;VSENSE&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Vcap ÷ 2&lt;/font&gt;" style="text;html=1;fontSize=12;align=right;fontColor=#1f4e79;" parent="a1" vertex="1">
+                    <mxGeometry x="600" y="368" width="125" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="ar4" value="&lt;b&gt;R4&lt;/b&gt;&lt;br&gt;1 MΩ" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="a1" vertex="1">
+                    <mxGeometry x="700" y="450" width="80" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_r4_gnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#000000;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="740" y="510" as="sourcePoint"/>
+                        <mxPoint x="740" y="620" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ac3" value="&lt;b&gt;C3&lt;/b&gt;&lt;br&gt;100 nF" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="a1" vertex="1">
+                    <mxGeometry x="840" y="450" width="80" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_c3_tap" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="740" y="390" as="sourcePoint"/>
+                        <mxPoint x="880" y="450" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="880" y="390"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aw_c3_gnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#000000;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="880" y="510" as="sourcePoint"/>
+                        <mxPoint x="880" y="620" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ausb" value="&lt;b&gt;USB — PC&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;ordinary cable, VBUS intact&lt;br&gt;powers the board and carries the log&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="a1" vertex="1">
+                    <mxGeometry x="980" y="205" width="260" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_usb_esp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#9673a6;endArrow=block;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1110" y="275" as="sourcePoint"/>
+                        <mxPoint x="1110" y="310" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aesp" value="&lt;b&gt;ESP32-C3 SuperMini&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;its onboard regulator makes 3V3&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;GPIO0&amp;nbsp; SDA&amp;nbsp; → BME280&lt;br&gt;GPIO1&amp;nbsp; SCL&amp;nbsp; → BME280&lt;br&gt;&lt;b&gt;GPIO3&amp;nbsp; ADC&amp;nbsp; ← VSENSE&lt;/b&gt;&lt;br&gt;GPIO4&amp;nbsp; CLK&amp;nbsp; → e-paper&lt;br&gt;GPIO5&amp;nbsp; RST&amp;nbsp; → e-paper&lt;br&gt;GPIO6&amp;nbsp; DIN&amp;nbsp; → e-paper&lt;br&gt;GPIO7&amp;nbsp; CS&amp;nbsp;&amp;nbsp; → e-paper&lt;br&gt;GPIO10 BUSY ← e-paper&lt;br&gt;&lt;b&gt;GPIO21 DC&amp;nbsp;&amp;nbsp; → e-paper&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;GPIO2 deliberately unused&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;verticalAlign=top;spacingTop=8;" parent="a1" vertex="1">
+                    <mxGeometry x="980" y="310" width="260" height="250" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_sense" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=3;strokeColor=#6c8ebf;endArrow=block;dashed=1;fontSize=12;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="740" y="390" as="sourcePoint"/>
+                        <mxPoint x="980" y="390" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="asenselabel" value="&lt;b&gt;WIRE 1 — sense tap&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;VSENSE → GPIO3&lt;/font&gt;" style="text;html=1;fontSize=12;align=center;fontColor=#1f4e79;" parent="a1" vertex="1">
+                    <mxGeometry x="760" y="340" width="200" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_esp_gnd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=4;strokeColor=#000000;endArrow=none;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1110" y="560" as="sourcePoint"/>
+                        <mxPoint x="1110" y="620" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="agndwirelabel" value="&lt;b&gt;WIRE 2 — common ground&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;without this the ADC reads nothing meaningful&lt;/font&gt;" style="text;html=1;fontSize=12;align=left;" parent="a1" vertex="1">
+                    <mxGeometry x="1130" y="570" width="330" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="abme" value="&lt;b&gt;BME280&lt;/b&gt;&lt;br&gt;I²C @ 0x76&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;3V3 from the SuperMini&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="a1" vertex="1">
+                    <mxGeometry x="1320" y="310" width="190" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_bme" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#9673a6;endArrow=none;fontSize=11;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1240" y="355" as="sourcePoint"/>
+                        <mxPoint x="1320" y="355" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="aepd" value="&lt;b&gt;2.9&quot; E-PAPER&lt;/b&gt;&lt;br&gt;296 x 128, SSD1680&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;3V3 from the SuperMini&lt;br&gt;put Vcap on it&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="a1" vertex="1">
+                    <mxGeometry x="1320" y="430" width="190" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="aw_epd" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#9673a6;endArrow=none;fontSize=11;" parent="a1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1240" y="485" as="sourcePoint"/>
+                        <mxPoint x="1320" y="485" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="agnd" value="&lt;b&gt;GND&lt;/b&gt;&amp;nbsp;&amp;nbsp; panel 1 −&amp;nbsp; ·&amp;nbsp; panel 2 −&amp;nbsp; ·&amp;nbsp; supercap −&amp;nbsp; ·&amp;nbsp; HT7533 GND&amp;nbsp; ·&amp;nbsp; dummy load&amp;nbsp; ·&amp;nbsp; &lt;b&gt;R4 bottom&lt;/b&gt;&amp;nbsp; ·&amp;nbsp; &lt;b&gt;C3 bottom&lt;/b&gt;&amp;nbsp; ·&amp;nbsp; &lt;b&gt;SuperMini GND pin&lt;/b&gt;&amp;nbsp; ·&amp;nbsp; meter black probe&amp;nbsp;&amp;nbsp; — one node, plain copper" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#000000;fontSize=13;fontColor=#ffffff;align=left;spacingLeft=16;" parent="a1" vertex="1">
+                    <mxGeometry x="50" y="620" width="1450" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="anote1" value="&lt;b&gt;WHY THIS TEST COMES FIRST&lt;/b&gt;&lt;br&gt;&lt;br&gt;Only &lt;b&gt;one regulator is live&lt;/b&gt;. The SuperMini&#39;s onboard 3.3 V regulator runs the MCU, the BME280 and the e-paper. The HT7533 runs the dummy load, or nothing.&lt;br&gt;&lt;br&gt;They never share a node, so there is no reverse path into the HT7533 and no two-regulator standoff on 3V3.&lt;br&gt;&lt;br&gt;Nothing here can be hurt by a flat cap, a bright window, or the order you plug things in. That is exactly why it comes before the sheet where the node runs &lt;i&gt;off&lt;/i&gt; the cap.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;The two circuits touch at two points and no others: the sense tap and GND.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="a1" vertex="1">
+                    <mxGeometry x="50" y="700" width="350" height="280" as="geometry"/>
+                </mxCell>
+                <mxCell id="anote2" value="&lt;b&gt;GND IS NOT OPTIONAL&lt;/b&gt;&lt;br&gt;&lt;br&gt;&quot;Separate circuit&quot; means separate &lt;i&gt;power&lt;/i&gt;, not separate ground.&lt;br&gt;&lt;br&gt;The ADC measures against the ESP&#39;s GND. If the supercap&#39;s − is not the same node as the SuperMini&#39;s GND pin, the reading is not wrong by an offset — it is &lt;b&gt;meaningless&lt;/b&gt;. The tap would be floating with respect to the thing measuring it.&lt;br&gt;&lt;br&gt;One wire does it: &lt;b&gt;supercap − to the SuperMini GND pin&lt;/b&gt;.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;The USB cable then earths that node through the PC. Harmless here — the scope probe grounds are already on it.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="a1" vertex="1">
+                    <mxGeometry x="420" y="700" width="350" height="280" as="geometry"/>
+                </mxCell>
+                <mxCell id="anote3" value="&lt;b&gt;THE SENSE PIN IS GPIO3, NOT GPIO2&lt;/b&gt;&lt;br&gt;&lt;br&gt;GPIO2 is an ESP32-C3 &lt;b&gt;strapping pin&lt;/b&gt; and must be high at reset. The divider would hold it at Vcap ÷ 2:&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;Vcap 4.6 V → 2.3 V → boots&lt;br&gt;Vcap 2.0 V → 1.0 V → marginal&lt;br&gt;Vcap 0.0 V → 0.0 V → &lt;b&gt;will not boot&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;This test &lt;i&gt;starts&lt;/i&gt; from a flat cap, so that is the first thing that would happen — and it presents as a dead board, not as a divider fault.&lt;br&gt;&lt;br&gt;Use &lt;b&gt;GPIO3&lt;/b&gt; (ADC1_CH3, not a strapping pin) and move e-paper &lt;b&gt;DC to GPIO21&lt;/b&gt; — free, because Serial is USB-CDC on GPIO18/19, so UART0 is unused.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;ADC1 on the C3 is GPIO0-4 only. 0/1 are I²C, 4 is CLK. GPIO3 is the one that is left.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="a1" vertex="1">
+                    <mxGeometry x="790" y="700" width="350" height="280" as="geometry"/>
+                </mxCell>
+                <mxCell id="anote4" value="&lt;b&gt;1 M / 1 M, AND WHERE IT STOPS BEING TRUE&lt;/b&gt;&lt;br&gt;&lt;br&gt;Two 1 MΩ resistors give ÷2 and bleed 2.3 µA at 4.6 V. The exact ratio does not matter — you calibrate it against the meter anyway.&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;Vcap 4.8 V → tap 2.40 V&amp;nbsp; trust it&lt;br&gt;Vcap 5.0 V → tap 2.50 V&amp;nbsp; edge&lt;br&gt;Vcap 6.2 V → tap 3.10 V&amp;nbsp; compressed&lt;/font&gt;&lt;br&gt;&lt;br&gt;The C3&#39;s ADC at 12 dB attenuation is calibrated to roughly 2.5 V. Above that it compresses and &lt;i&gt;understates&lt;/i&gt; — read it as &quot;high&quot;, not as a number. The measured 4.8 V indoor Voc sits comfortably inside.&lt;br&gt;&lt;br&gt;&lt;b&gt;No damage risk either way&lt;/b&gt;: Vcap cannot exceed Voc − Vf ≈ 6.2 V, and 1 MΩ limits any clamp current to a couple of µA.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;100 nF at the tap: 500 kΩ × 100 nF = 50 ms, settled long before you read it.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="a1" vertex="1">
+                    <mxGeometry x="1160" y="700" width="350" height="280" as="geometry"/>
+                </mxCell>
+                <mxCell id="anote5" value="&lt;b&gt;FIRMWARE — THREE CHANGES&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;1. Pin the I²C bus.&lt;/b&gt; The autodetect sweeps GPIO0-10 hunting the BME280 and will otherwise claim the ADC pin.&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;#define FORCE_SDA 0&lt;br&gt;#define FORCE_SCL 1&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;2. Move DC off GPIO3.&lt;/b&gt;&amp;nbsp;&amp;nbsp; &lt;font face=&quot;Courier New&quot;&gt;#define EPD_DC 21&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;3. Read millivolts, not counts&lt;/b&gt; — the efuse calibration is doing real work at these levels.&lt;br&gt;&lt;br&gt;&lt;font face=&quot;Courier New&quot;&gt;#define VSENSE_PIN 3&lt;br&gt;#define VDIV_NUM&amp;nbsp;&amp;nbsp; 2.0f&amp;nbsp;&amp;nbsp;&amp;nbsp; // (R3+R4)/R4&lt;br&gt;#define VDIV_CAL&amp;nbsp;&amp;nbsp; 1.000f&amp;nbsp; // fit to the DMM&lt;br&gt;&lt;br&gt;float readVcap() {&lt;br&gt;&amp;nbsp; analogSetPinAttenuation(VSENSE_PIN, ADC_11db);&lt;br&gt;&amp;nbsp; (void)analogReadMilliVolts(VSENSE_PIN);  // discard&lt;br&gt;&amp;nbsp; uint32_t acc = 0;&lt;br&gt;&amp;nbsp; for (int i = 0; i &amp;lt; 32; i++)&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; acc += analogReadMilliVolts(VSENSE_PIN);&lt;br&gt;&amp;nbsp; return acc / 32.0f * VDIV_NUM * VDIV_CAL / 1000.0f;&lt;br&gt;}&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;On Arduino-ESP32 3.x &lt;font face=&quot;Courier New&quot;&gt;ADC_11db&lt;/font&gt; still compiles as a deprecated alias for &lt;font face=&quot;Courier New&quot;&gt;ADC_ATTEN_DB_12&lt;/font&gt;. Same setting, renamed.&lt;br&gt;&lt;br&gt;Print the result as &lt;font face=&quot;Courier New&quot;&gt;#&lt;/font&gt;-commented CSV with the same column shape scope_log.py emits, and the existing tooling plots both with no changes.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="a1" vertex="1">
+                    <mxGeometry x="50" y="1000" width="720" height="320" as="geometry"/>
+                </mxCell>
+                <mxCell id="anote6" value="&lt;b&gt;WHAT THIS RUN BUYS YOU&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;1. Calibrate.&lt;/b&gt; Cap at any steady voltage. Read it with the DMM, read the ESP&#39;s number, set &lt;font face=&quot;Courier New&quot;&gt;VDIV_CAL&lt;/font&gt; = meter ÷ ESP. One point is enough: the divider is linear and the ADC mostly is, below 2.5 V.&lt;br&gt;&lt;br&gt;&lt;b&gt;2. Charge curve, two instruments.&lt;/b&gt; Link in, panels lit, run &lt;font face=&quot;Courier New&quot;&gt;scope_log.py&lt;/font&gt; on VCAP and let the ESP log its own ADC at the same time. Same curve by two paths — and the difference between them &lt;i&gt;is&lt;/i&gt; the ADC error plotted against voltage, for free.&lt;br&gt;&lt;br&gt;&lt;b&gt;3. Discharge at a realistic rate.&lt;/b&gt; Pull the link, hang the 130 Ω on the LDO, let the ESP log the fall. That is open item 2 in the design notes — effective capacitance at 25 mA instead of 3-5 mA — with the ESP as the datalogger and nothing at risk.&lt;br&gt;&lt;br&gt;&lt;b&gt;4. Put Vcap on the e-paper.&lt;/b&gt; Costs nothing here, and proves the display path carries the number you will actually want outdoors.&lt;br&gt;&lt;br&gt;&lt;b&gt;WHAT IT DOES NOT COVER&lt;/b&gt;&lt;br&gt;The LDO under the ESP&#39;s own load, brownout at dropout, and sleep current. All three need the node running &lt;i&gt;from&lt;/i&gt; the cap — a later sheet, and the one where the 3V3 conflict has to be solved properly.&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Re-check &lt;font face=&quot;Courier New&quot;&gt;VDIV_CAL&lt;/font&gt; once you get there. The C3&#39;s ADC reference is efuse-calibrated and largely supply-independent, but &quot;largely&quot; is worth one confirming reading.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" parent="a1" vertex="1">
+                    <mxGeometry x="790" y="1000" width="720" height="320" as="geometry"/>
+                </mxCell>
+                <mxCell id="anever" value="&lt;b&gt;NEVER ON THIS SHEET&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;HT7533 VOUT to the SuperMini 3V3 pin&lt;/b&gt; — that is a different test and it needs a blocking element first: with a flat cap the onboard regulator backfeeds through the HT7533&#39;s body diode into 4 F and stalls around 2.7 V.&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;VCAP to the 5V pin while USB is plugged&lt;/b&gt; — the 5V pin &lt;i&gt;is&lt;/i&gt; VBUS, so that is a bare wire from a lit panel to the USB host.&lt;br&gt;&lt;b&gt;The tap straight to a GPIO&lt;/b&gt; — without R3/R4 that is 4.8 V into a 3.3 V pin.&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;Two circuits with no common ground.&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; &lt;b&gt;This rig in a window, unattended&lt;/b&gt; — there is still no clamp fitted." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;align=left;verticalAlign=middle;spacingLeft=16;" parent="a1" vertex="1">
+                    <mxGeometry x="50" y="1350" width="1450" height="80" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

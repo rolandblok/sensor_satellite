@@ -5,21 +5,21 @@ low-Iq LDO → ESP32-C3 + BME280 + 2.9" e-paper.
 
 | File | What |
 | ---- | ---- |
-| `solar_node.net` | **the netlist** — every component and net, authoritative |
 | `solar_node.pdf` / `.svg` | rendered schematic, nothing needed to view it |
 | `solar_node.drawio` | block diagram and the bench-test wiring sheets |
 | `tools/gen_schematic.py` | the circuit as code; regenerates the schematic |
 | `tools/scope_log.py` | logs DC measurements off the DS1054Z over LAN to CSV |
 | this file | design notes and measurements, renders on GitHub |
 
-**There is no KiCad project in this repo.** It was removed on 2026-08-21. What
-survives is the generator, the netlist and the rendered output, which between
-them pin the circuit down completely — `gen_schematic.py` is the definition,
-`solar_node.net` is what it produced, and the PDF/SVG are what that looks like.
+**There is no KiCad project in this repo.** It was removed on 2026-08-21, and
+the exported netlist `solar_node.net` was dropped on 2026-08-28 once it had
+fallen far enough behind the design to mislead. What survives is the generator
+and the rendered output — `gen_schematic.py` is the definition, the PDF/SVG are
+what it last looked like.
 
 The Mermaid diagram below is a **block diagram**, not a schematic: connectivity
-and values, no component symbols. For the circuit itself use the netlist or the
-rendered PDF. For wiring something up on the bench, use the drawio.
+and values, no component symbols. For the circuit itself use `gen_schematic.py`
+or the rendered PDF. For wiring something up on the bench, use the drawio.
 
 ## Verification
 
@@ -45,9 +45,12 @@ invisible in a drawing tool:
   `GPIO2_VSENSE`, so the ADC input was connected to nothing.
 
 **Nothing has re-verified the circuit since.** Design notes 8a and 9 changed it
-on paper — the USB feed `D3` and its 22 Ω are not in the netlist, and neither is
-the HT7533 in place of the MCP1700. Treat `solar_node.net` as accurate up to
-2026-08-19 and the design notes as the current intent.
+on paper — the USB feed `D3` and its 22 Ω were never in the schematic, and
+neither is the HT7533 in place of the MCP1700. The sense pin has since moved
+from GPIO2 to GPIO3 and e-paper DC from GPIO3 to GPIO21 (design note 5), which
+`gen_schematic.py` also predates. **The design notes, the drawio and
+[gpio.md](gpio.md) are the current intent; `gen_schematic.py` and the rendered
+PDF/SVG are accurate only up to 2026-08-19.**
 
 ```mermaid
 flowchart LR
@@ -71,7 +74,7 @@ flowchart LR
         CLAMP["OVERVOLTAGE CLAMP<br/>5.1 V shunt · TL431 or zener<br/>(required: Voc exceeds cap rating)"]
         CAP["SUPERCAP<br/>5.5 V · 4 F<br/>(2 × 2.7 V cells in series)"]
         BAL["CELL BALANCING<br/>2 × 100 kΩ<br/>(omit only if already fitted)"]
-        DIV["VCAP SENSE<br/>1 MΩ / 1 MΩ + 100 nF<br/>(2.7 µA bleed)"]
+        DIV["VCAP SENSE<br/>1 MΩ / 1 MΩ + 100 nF<br/>(2.3 µA at 4.6 V)"]
         CAP --- BAL
     end
 
@@ -91,9 +94,9 @@ flowchart LR
     RAIL --- DIV
     RAIL -->|"4.6 V → 3.6 V usable"| LDO
     LDO -->|"3.3 V"| ESP
-    DIV -.->|"ADC · GPIO2"| ESP
+    DIV -.->|"ADC · GPIO3"| ESP
     ESP <-->|"I²C · GPIO0/1"| BME
-    ESP -->|"SPI · GPIO3-7"| EPD
+    ESP -->|"SPI · GPIO4-7, DC GPIO21"| EPD
     EPD -.->|"BUSY · GPIO10"| ESP
 
     classDef solar fill:#fff2cc,stroke:#d6b656,color:#000
@@ -125,8 +128,8 @@ flowchart LR
 
     ESP ---|"GPIO0 · SDA"| BME
     ESP ---|"GPIO1 · SCL"| BME
-    DIV -->|"GPIO2 · ADC1"| ESP
-    ESP -->|"GPIO3 · DC"| EPD
+    DIV -->|"GPIO3 · ADC1"| ESP
+    ESP -->|"GPIO21 · DC"| EPD
     ESP -->|"GPIO4 · CLK"| EPD
     ESP -->|"GPIO5 · RST"| EPD
     ESP -->|"GPIO6 · DIN"| EPD
@@ -184,10 +187,26 @@ past its rating. Doubling the panel count makes this more urgent, not less.
 only `4 F × (4.6 − 3.6) = 4 C` is usable — about 13 J at 3.3 V, not the 60 J the
 raw capacitor figure suggests.
 
-**5. The sense divider must be high impedance.** 100 kΩ/100 kΩ bleeds 27 µA,
-comparable to the entire sleep budget. 1 MΩ/1 MΩ bleeds 2.7 µA; the 100 nF at
-the tap gives the ADC something to charge from, since the ESP32 sampler wants a
-low source impedance.
+**5. The sense divider must be high impedance.** Both resistors sit permanently
+across the cap, so they drain it whether the node is awake or not. At the 4.6 V
+working rail, 100 kΩ/100 kΩ bleeds 23 µA — comparable to the entire sleep
+budget. **1 MΩ/1 MΩ is what is fitted**: ÷2, and 2.3 µA. The 100 nF at the tap
+gives the ADC something to charge from, since the ESP32 sampler wants a low
+source impedance — 500 kΩ × 100 nF is 50 ms, settled long before anything reads
+it.
+
+It taps **GPIO3**, not GPIO2. GPIO2 is a strapping pin that must be high at
+reset, and the divider would hold it at Vcap ÷ 2 — so a flat cap holds it at 0 V
+and the node will not boot. That failure presents as a dead board rather than a
+bad reading, and every bench run starts from a flat cap. E-paper DC moves to
+GPIO21 to free GPIO3, which is safe because `Serial` is USB-CDC and UART0 is
+never initialised.
+
+The ADC itself is the accuracy limit, not the divider. At 12 dB attenuation the
+C3 is calibrated to roughly 2.5 V at the pin, so the tap is good to about Vcap
+4.8 V and compresses above that — read anything higher as "high", not as a
+number. Calibrate `VDIV_CAL` against the meter at one steady voltage; the
+divider is linear and the ADC mostly is below 2.5 V.
 
 **6. Charging is fast; harvesting is not.** 4 C at 400 mA is ~10 s of full sun.
 The design constraint is overcast days and winter, not charge time.
@@ -209,7 +228,7 @@ real Voc.
 
 Against that ceiling there is a floor. With the ESP fully disconnected the rail
 still leaks: supercap self-leakage 10–30 µA, balance resistors 27 µA if fitted,
-Schottky reverse leakage perhaps 10–40 µA for the pair, divider 2.5 µA. Call it
+Schottky reverse leakage perhaps 10–40 µA for the pair, divider 2.3 µA. Call it
 50–100 µA. **Below that panel current the cap never charges at all** — it settles
 where panel current equals leakage, which can be well under `Voc − Vf` because
 the panel's I-V curve collapses near Voc.
@@ -354,6 +373,112 @@ The charge current was derived from the cap rather than an ammeter:
 ~2 h 15 m to 4.5 V. Against an estimated 0.6 mA average draw that is break-even
 at about 7 h of this light per day — marginal indoors, but indoor light is not
 the deployment case. Overcast daylight outdoors is typically 10–100× brighter.
+
+## Witness logger
+
+`Serial` on the node is native USB-CDC, so it disappears the moment USB is
+unplugged — which is exactly when the node runs from the cap and exactly when
+the log matters. A Wemos D1 mini on the bench USB solves it, and doubles as a
+second, independent Vcap instrument.
+
+| | |
+| --- | --- |
+| Sketch | [`logger_d1_mini/`](logger_d1_mini/logger_d1_mini.ino) |
+| Board | Wemos D1 mini (ESP8266), USB powered, `esp8266:esp8266:d1_mini` |
+
+### Wiring — three wires
+
+```
+  node GPIO20 ---[ 1k ]--- D7 (GPIO13)     log mirror, node talks only
+  node GND --------------- GND             common reference, mandatory
+  VCAP --------[300k]----- A0              independent Vcap witness
+```
+
+**Never link 3V3 or 5V between the boards.** The node runs from the cap and the
+logger from USB; a supply link back-feeds the cap and destroys the measurement
+the run exists to make. Ground and signals only.
+
+The node mirrors every log line out of GPIO20 as plain UART — UART0's TX
+remapped, free because `Serial` is USB-CDC on GPIO18/19. The logger reads it
+with SoftwareSerial on D7 and re-prints it verbatim on its own COM port, so the
+existing tooling sees the node's CSV unchanged. Reception has to be soft: the
+ESP8266's only UART with an RX is on GPIO1/GPIO3, hardwired to the CH340, and
+UART1 is TX-only.
+
+### The A0 branch is its own divider
+
+It rides the D1 mini's onboard 220 k / 100 k:
+
+```
+VCAP --[300k]--+-- A0 --[220k]--+--[100k]-- GND
+                                |
+                               ADC 0-1 V
+```
+
+**300 kΩ is not a round number, it is the right one.** Full scale lands at
+`1.0 V × 620/100 = 6.20 V`, which is exactly `Voc − Vf`, the highest voltage the
+cap can physically reach — so the whole ADC range is used and it never clips.
+A0 sees `6.2 × 320/620 = 3.20 V` at that ceiling, exactly its rating. Costs
+7.4 µA at 4.6 V. Pull the wire for a sleep-current run, where it would be a
+third of the figure being measured.
+
+**Do not tap the node's 1 MΩ/1 MΩ divider instead.** A0 is not high-impedance —
+it is 320 kΩ to ground. On the midpoint it parallels the lower 1 MΩ leg:
+
+```
+1M ∥ 320k = 242 kΩ    ->    ratio 0.195, was 0.500
+```
+
+Measured, not theorised: with A0 on the tap the node read **1.868 V** where it
+had read **4.596 V** — a factor of 2.46 against 2.56 predicted. Worse, both
+instruments then agreed with each other to within 2% and were both wrong by
+2.5×. Two instruments sharing a front end do not cross-check, they confirm each
+other's error. The disagreement you want to see is exactly what sharing deletes.
+
+### Output
+
+Node lines pass through untouched; the logger tags its own readings `L,` and
+emits them only at a line boundary, so a node CSV row is never cut in half.
+
+```
+# logger_d1_mini - listening on D7 (GPIO13) at 115200 8N1
+# node output passes through verbatim; own readings are tagged 'L,'
+# L,t_s,Vcap_V   (A0 via 300k, scale 0.005721 V/count)
+L,23.0,4.816
+0.6,24.67,52.8,14.4,1007.78,1009.81,24.7,24.7,4.811
+```
+
+Split the streams with `^L,` — the rest is the node's own CSV.
+
+The point of the second instrument is the blind zone. The node dies at LDO
+dropout, ~3.6 V, so the bottom of every charge curve and the brownout itself are
+invisible to it. The logger runs from USB and watches the cap from 0 V up and
+from 3.6 V down.
+
+### Calibration
+
+One DMM reading against the cap terminals sets both. Measured 2026-08-28 with
+the cap steady at **4.81 V**:
+
+| | Reads | Constant | Where |
+| --- | --- | --- | --- |
+| Node ADC | 4.7962 V, mean of 5 boots | `VDIV_CAL 1.0149` | node sketch |
+| Logger ADC | 4.8068 V | `VCAP_SCALE 0.005721` | logger sketch |
+
+After: node 4.81–4.83 V, logger 4.816 V, against a meter reading 4.81 V.
+
+The two corrections say something useful about the instruments. The logger's
+nominal `0.006061` implies a 620 kΩ chain; the fitted value implies 585 kΩ, a
+5.7% trim — resistor tolerance plus the ESP8266's ADC reference, both loose. The
+node needed 1.5%, because its path is two 1 MΩ resistors and an efuse-calibrated
+ADC. Node ADC repeatability is the limit at ~±0.3%: five boots spread
+4.782–4.811 V.
+
+**Re-check `VDIV_CAL` once the node runs from the cap rather than USB.** The C3's
+ADC reference is efuse-calibrated and largely supply-independent, but "largely"
+is worth one confirming reading.
+
+---
 
 ## Still unmeasured
 
