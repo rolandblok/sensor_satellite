@@ -422,6 +422,27 @@ A0 sees `6.2 × 320/620 = 3.20 V` at that ceiling, exactly its rating. Costs
 7.4 µA at 4.6 V. Pull the wire for a sleep-current run, where it would be a
 third of the figure being measured.
 
+### It drains the cap, always
+
+Both sense branches are permanent resistive paths from VCAP to ground. At 4.81 V:
+
+| Path | Resistance | Drain |
+| ---- | ---------- | ----- |
+| A0 branch (300 k + 220 k + 100 k) | 620 kΩ | 7.8 µA |
+| Node divider (1 M + 1 M) | 2 MΩ | 2.4 µA |
+| **Total** | 473 kΩ | **10.2 µA** |
+
+**Unplugging the logger's USB does not stop it.** The 220 k/100 k are passive
+resistors to the D1 mini's ground, which is tied to the node's. Only removing
+the wire stops the drain.
+
+Irrelevant for charge and discharge runs — τ = 473 kΩ × 4 F ≈ 22 days, so the
+dividers alone would take ~6 days to walk the cap from 4.81 V down to the 3.6 V
+dropout, against experiments lasting minutes. It matters for the leakage-floor
+and sleep-current runs, where 10 µA is 10–20% of the 50–100 µA being resolved.
+Pull the A0 wire for those rather than subtracting a correction that carries its
+own tolerance error.
+
 **Do not tap the node's 1 MΩ/1 MΩ divider instead.** A0 is not high-impedance —
 it is 320 kΩ to ground. On the midpoint it parallels the lower 1 MΩ leg:
 
@@ -477,6 +498,65 @@ ADC. Node ADC repeatability is the limit at ~±0.3%: five boots spread
 **Re-check `VDIV_CAL` once the node runs from the cap rather than USB.** The C3's
 ADC reference is efuse-calibrated and largely supply-independent, but "largely"
 is worth one confirming reading.
+
+---
+
+## Which instrument to believe
+
+The two have complementary trustworthy ranges, which is worth knowing before
+reading any curve.
+
+| Vcap | Node (GPIO3) | Logger (A0) |
+| ---- | ------------ | ----------- |
+| 0 – 3.6 V | dead — below LDO dropout | **only source** |
+| 3.6 – 5.0 V | **better** — efuse-calibrated, ±0.3% | valid, looser |
+| 5.0 – 6.2 V | compresses — tap past the ~2.5 V calibrated point | **better** |
+| above 6.2 V | — | clips at full scale, read as "high" |
+
+The node divides by 2, so its tap hits the C3's ~2.5 V calibration ceiling at
+Vcap 5.0 V. At the 4.81 V measured on 2026-08-28 it is just inside, with little
+margin. The logger's full scale is 6.20 V by construction, so it covers the top
+of the range and the whole region below dropout where the node is not running.
+
+---
+
+## Where this left off — 2026-08-28
+
+Working and verified on hardware:
+
+* Pin layout rewired and flashed. Sense on **GPIO3**, e-paper DC on **GPIO21**,
+  log mirror on **GPIO20**. GPIO2 deliberately unconnected. Only GPIO8/GPIO9
+  remain free and both are strapping pins — the board is full.
+* Node reports Vcap as a `Vcap_V` CSV column and on the panel header, mirrored
+  out GPIO20 so the log survives USB being unplugged.
+* D1 mini witness logger passing the node's stream through and adding its own
+  independent A0 reading.
+* Both ADCs calibrated against a DMM at 4.81 V — node 4.819 V, logger 4.816 V.
+
+Bench gotchas worth remembering:
+
+* The D1 mini's CH340 only works with the **older 3.5.2019.1 driver**. With
+  3.9.2024.9 it enumerates and reports healthy, but no process can open the
+  port — it looks like a dead cable and is not.
+* Node ADC repeatability is **±0.3%** (five boots spread 4.782–4.811 V). That is
+  the calibration limit, not the meter.
+* `LOG_S` is dead code: `loop()` delays on `CYCLE_S`, so logging is one row per
+  300 s. Too slow for a discharge run — lower `CYCLE_S` or wire up `LOG_S`
+  before the next capture.
+
+Next, in order:
+
+1. **Lower `CYCLE_S`** so a discharge run produces a usable curve.
+2. **Re-check `VDIV_CAL` on cap power.** Everything so far was measured with the
+   node on USB. The C3's ADC reference is efuse-calibrated and largely
+   supply-independent, but "largely" deserves one confirming reading.
+3. **Leakage floor and sleep current.** Pull the A0 wire first. Consider logging
+   to the C3's own flash instead, so no wire crosses to a USB-powered board.
+4. Then the open items below — capacitance against discharge rate, ESR, and Isc
+   outdoors on an overcast day.
+
+**The clamp is still not fitted.** Do not leave this rig charging in a window
+unattended.
 
 ---
 
