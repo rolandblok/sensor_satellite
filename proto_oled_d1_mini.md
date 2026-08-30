@@ -2,6 +2,12 @@
 
 First build with the parts on hand, before the ESP32-C3 / e-paper / solar hardware arrives.
 
+**Superseded, but the hardware was reused.** The same D1 mini and OLED now serve
+as the witness logger for the solar rig — see the *Witness logger* section of
+[solar_node.md](solar_node.md). That build shares the D1/D2 I²C wiring below but
+uses **300 kΩ** on A0 rather than the 270 kΩ described here, and a different
+`VCAP_SCALE`. Do not mix the two sets of numbers.
+
 Parts available now:
 
 * Wemos D1 mini (ESP8266)
@@ -92,6 +98,11 @@ Vcap = raw * (1.0/1023) * (590/100) = raw * 0.005767
 
 Calibrate `VCAP_SCALE` in the sketch against a multimeter — resistor tolerance
 and the ESP8266 ADC reference both drift several percent.
+
+The witness-logger build picks 300 kΩ instead, which puts full scale at 6.20 V —
+exactly `Voc − Vf` for the solar rig, so the whole ADC range is used and it never
+clips. 270 kΩ here was sized for a cap charged from USB, which cannot exceed
+5 V.
 
 ---
 

@@ -144,8 +144,9 @@ link between them back-feeds the cap and destroys the measurement the run exists
 to make. Unidirectional leaves one back-feed path and the 1 kΩ caps it at µA.
 
 The logger also carries a third wire — its own 300 kΩ from VCAP to A0 — as an
-independent Vcap instrument that keeps reading below LDO dropout. Wiring, the
-300 kΩ reasoning and the calibration are in [solar_node.md](solar_node.md).
+independent Vcap instrument that keeps reading below LDO dropout, and a small
+OLED showing both readings. Wiring, the 300 kΩ reasoning, the display layout
+and the calibration are in [solar_node.md](solar_node.md).
 
 `Serial0.begin()` must run **before** `display.init()`: UART0's default TX is
 GPIO21, and the `pinMode()` inside `init()` is what takes GPIO21 back off the

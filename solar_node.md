@@ -378,21 +378,36 @@ the deployment case. Overcast daylight outdoors is typically 10–100× brighter
 
 `Serial` on the node is native USB-CDC, so it disappears the moment USB is
 unplugged — which is exactly when the node runs from the cap and exactly when
-the log matters. A Wemos D1 mini on the bench USB solves it, and doubles as a
-second, independent Vcap instrument.
+the log matters. A Wemos D1 mini on the bench USB solves it, doubles as a
+second independent Vcap instrument, and shows both readings on a small OLED so
+the rig can be watched without a terminal.
 
 | | |
 | --- | --- |
 | Sketch | [`logger_d1_mini/`](logger_d1_mini/logger_d1_mini.ino) |
 | Board | Wemos D1 mini (ESP8266), USB powered, `esp8266:esp8266:d1_mini` |
 
-### Wiring — three wires
+### Wiring
+
+Three wires to the node:
 
 ```
   node GPIO20 ---[ 1k ]--- D7 (GPIO13)     log mirror, node talks only
   node GND --------------- GND             common reference, mandatory
   VCAP --------[300k]----- A0              independent Vcap witness
 ```
+
+Four more to the OLED (SSD1306 128×64 I²C), all local to the logger:
+
+```
+  OLED VCC ---- 3V3        OLED SDA ---- D2 (GPIO4)
+  OLED GND ---- GND        OLED SCL ---- D1 (GPIO5)
+```
+
+The OLED runs entirely off the logger's USB-fed 3V3 and never touches VCAP. It
+draws 10–20 mA, which would be fatal to a 4 F cap and is free on USB. D1/D2 are
+the ESP8266 `Wire` defaults, match the prototype 0 bench rig, and avoid every
+strapping pin (D3/GPIO0, D4/GPIO2, D8/GPIO15).
 
 **Never link 3V3 or 5V between the boards.** The node runs from the cap and the
 logger from USB; a supply link back-feeds the cap and destroys the measurement
@@ -462,19 +477,71 @@ Node lines pass through untouched; the logger tags its own readings `L,` and
 emits them only at a line boundary, so a node CSV row is never cut in half.
 
 ```
+# node link: D7 HIGH  (node TX idle, wire present)
 # logger_d1_mini - listening on D7 (GPIO13) at 115200 8N1
 # node output passes through verbatim; own readings are tagged 'L,'
 # L,t_s,Vcap_V   (A0 via 300k, scale 0.005721 V/count)
-L,23.0,4.816
-0.6,24.67,52.8,14.4,1007.78,1009.81,24.7,24.7,4.811
+# I2C idle: SDA=HIGH SCL=HIGH  (bus alive)
+# I2C device at 0x3C  (SSD1306)
+# OLED at 0x3C on SDA=D2 SCL=D1
+L,1.0,4.709
+0.5,24.00,54.6,14.3,1010.89,1012.93,24.0,24.0,4.718
 ```
 
 Split the streams with `^L,` — the rest is the node's own CSV.
+
+Two boot self-tests earn their place, because both failure modes cost an
+afternoon before they existed:
+
+* **`node link: D7 HIGH/LOW`** drives D7 low, releases it, and samples. An idle
+  UART on the far end pulls it back through the 1 kΩ in nanoseconds; a floating
+  pin holds the charge for milliseconds. That separates a disconnected wire from
+  a node that is simply silent — identical from the stream alone, and the node
+  only speaks once every `CYCLE_S`.
+* **`I2C idle: SDA=.. SCL=..`** plus an address sweep. An idle I²C bus must sit
+  high on both lines; both low means no pull-ups, an unpowered module or a
+  short, and no address will ever ACK no matter what the code does. That is
+  exactly what a loose OLED VCC looks like, and it is indistinguishable from a
+  wrong address until you look at the levels.
 
 The point of the second instrument is the blind zone. The node dies at LDO
 dropout, ~3.6 V, so the bottom of every charge curve and the brownout itself are
 invisible to it. The logger runs from USB and watches the cap from 0 V up and
 from 3.6 V down.
+
+### Display
+
+```
+ yellow  rows 0-15    284s  -6mV        countdown to the node's next row,
+ ---------------------------------      and the gap between instruments
+ blue    rows 16-63   4.712 V           logger A0, live, 1 Hz
+                      node 4.718 V      the node's last word
+```
+
+This panel is a **dual-colour SSD1306**: rows 0–15 emit yellow, rows 16–63 blue,
+fixed in the glass and not addressable. Anything straddling y=16 comes out half
+one colour and half the other and reads as a fault, so the layout is built round
+the boundary — header entirely above it, all numbers entirely below. `BAND_Y` in
+the sketch marks the line. 9×15 bold is the tallest cell that fits the yellow
+band whole: baseline at row 12 puts the glyph top at row 1 and the descender at
+row 15.
+
+The countdown is to the node's next expected row. The logger **learns the period
+by timing the gap between rows it receives** rather than hard-coding `CYCLE_S`,
+so the countdown stays honest when `CYCLE_S` changes on the node. After
+`NODE_STALE_S` (400 s) of silence the header switches to **`NODE QUIET`** —
+the brownout indicator, readable across a bench.
+
+There is no burn-in mitigation. An earlier version shifted the frame a pixel a
+minute; it was removed in favour of legibility, and contrast runs at full
+(`OLED_CONTRAST 255`). If the rig is ever left displaying for weeks, that is the
+trade to revisit.
+
+**A dead display cannot take the logger down.** The relay is this board's real
+job, so the OLED is probed for an ACK before each redraw; if it stops answering
+the logger says so, keeps relaying, and re-probes every 5 s, picking the display
+back up with no reflash. That guard exists because a loose display wire once
+wedged a bit-banged 1024-byte transfer and silenced the whole board.
 
 ### Calibration
 
@@ -520,7 +587,7 @@ of the range and the whole region below dropout where the node is not running.
 
 ---
 
-## Where this left off — 2026-08-28
+## Where this left off — 2026-08-30
 
 Working and verified on hardware:
 
@@ -529,9 +596,11 @@ Working and verified on hardware:
   remain free and both are strapping pins — the board is full.
 * Node reports Vcap as a `Vcap_V` CSV column and on the panel header, mirrored
   out GPIO20 so the log survives USB being unplugged.
-* D1 mini witness logger passing the node's stream through and adding its own
-  independent A0 reading.
+* D1 mini witness logger passing the node's stream through, adding its own
+  independent A0 reading, and displaying both on a dual-colour OLED with a
+  countdown to the node's next row and the delta between the two.
 * Both ADCs calibrated against a DMM at 4.81 V — node 4.819 V, logger 4.816 V.
+  Last checked 2026-08-30: node 4.718 V, logger 4.712 V, 6 mV apart.
 
 Bench gotchas worth remembering:
 
@@ -542,7 +611,13 @@ Bench gotchas worth remembering:
   the calibration limit, not the meter.
 * `LOG_S` is dead code: `loop()` delays on `CYCLE_S`, so logging is one row per
   300 s. Too slow for a discharge run — lower `CYCLE_S` or wire up `LOG_S`
-  before the next capture.
+  before the next capture. The logger's countdown learns the new period on its
+  own, so nothing needs reflashing there.
+* An idle I²C bus sits **high** on both lines. Both low means no pull-ups, no
+  power, or a short — not a wrong address. The logger prints the idle levels at
+  boot for exactly this reason.
+* The D1 mini's IRAM is at 95% with U8g2 and SoftwareSerial both linked in.
+  There is little headroom left on that board.
 
 Next, in order:
 

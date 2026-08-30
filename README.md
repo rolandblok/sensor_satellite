@@ -95,7 +95,7 @@ arduino-cli compile --upload -p COM5 \
 | [`proto_epaper_esp32c3/`](proto_epaper_esp32c3/) | current firmware — BME280 + e-paper |
 | [`proto_oled_esp32c3/`](proto_oled_esp32c3/) | sensor-only build, serial logging, no display |
 | [`i2c_scan/`](i2c_scan/) | I²C scanner; sweeps every pin pair to find the bus |
-| [`logger_d1_mini/`](logger_d1_mini/) | D1 mini witness logger — keeps the log alive on cap power |
+| [`logger_d1_mini/`](logger_d1_mini/) | D1 mini witness logger — relays the node's log on cap power, second Vcap ADC, OLED readout |
 | [`gpio.md`](gpio.md) | ESP32-C3 SuperMini pinout and this build's pin map |
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |
