@@ -145,6 +145,11 @@ humidity sensor, returning a plausible constant. The firmware reads
 re-enumerates on wake, so terminals disconnect each cycle. Keep
 `USE_DEEP_SLEEP 0` while developing.
 
+Since 2026-08-30 the default is `1`, because the node now runs from the cap with
+USB unplugged and the log leaves over the GPIO20 mirror instead. The cost is that
+the port exists for only ~5 s per `CYCLE_S`, so reflashing wants the BOOT button
+— see *Deep sleep costs you casual reflashing* in the [README](README.md).
+
 **Check for an always-on power LED.** Many SuperMini boards fit one drawing
 1–3 mA. That is 30× the target sleep budget and will dominate the solar design.
 Desolder it before the battery build.
@@ -163,7 +168,7 @@ Unified Sensor**.
 | `LOG_S` | `2` | serial log interval when not deep sleeping |
 | `ALTITUDE_M` | `17.0` | Eindhoven, ~17 m AMSL — for sea-level pressure |
 | `MIN_REFRESH_C` | `0.0` | below this the panel is skipped, image kept |
-| `USE_DEEP_SLEEP` | `0` | 1 = sleep between cycles |
+| `USE_DEEP_SLEEP` | `1` | 1 = sleep between cycles; `0` while USB-tethered |
 | `FORCE_SDA` / `FORCE_SCL` | `0` / `1` | I²C pinned; set both to `-1` to auto-detect again |
 | `VSENSE_PIN` | `3` | supercapacitor divider tap |
 | `VDIV_NUM` | `2.0` | divider ratio, `(R3+R4)/R4` |
@@ -244,6 +249,73 @@ will need: the previous frame's state must persist to redraw only what changed.
 
 ---
 
+## Floating pins in deep sleep
+
+An unconnected GPIO configured as an input floats. A CMOS input parked near
+mid-rail turns both transistors partly on and burns shoot-through current — µA
+per pin, not mA, but it is nondeterministic and it is noise in any sleep-current
+measurement. Two things make this worse on the C3 than it first looks.
+
+**Outputs do not stay outputs.** Entering deep sleep releases the digital pads
+to high-Z unless you latch them. A pin you carefully drove high before sleeping
+is floating a microsecond later. The latch is:
+
+```c
+gpio_hold_en((gpio_num_t)8);      // per pin, before sleeping
+gpio_deep_sleep_hold_en();        // once, arms the latch for deep sleep
+```
+
+and on the next boot `gpio_hold_dis((gpio_num_t)8)` before you use the pin
+again, or writes to it silently do nothing. On the C3, GPIO0–GPIO5 are RTC-capable
+and hold through the RTC domain; the rest are digital pads and need
+`gpio_deep_sleep_hold_en()`.
+
+**Three pins here are strapping pins**, so the level is not free choice:
+
+| Pin | Requirement | Safe idle |
+| --- | ----------- | --------- |
+| GPIO2 | HIGH at boot | pull-up, never pull-down |
+| GPIO8 | HIGH at boot; onboard blue LED, active LOW | drive/pull **high** — also keeps the LED dark |
+| GPIO9 | HIGH at boot (LOW = download mode) | has the BOOT button's external pull-up; leave it |
+
+### The rules
+
+1. **Never leave a pin as a bare input with nothing driving it.** Enable an
+   internal pull. On a genuinely unconnected pin a pull costs nothing — no
+   current flows because there is nowhere for it to go. It only costs current if
+   something external fights it.
+2. **Match the pull to the idle level** of whatever normally drives the pin, so
+   that reconnecting the peripheral does not fight the pull.
+3. **Latch anything that must hold a level**, per above.
+4. **Check strapping pins first.** A pull-down on GPIO2, GPIO8 or GPIO9 stops the
+   board booting, and GPIO9 low puts it in download mode looking dead.
+
+### For this build
+
+With the peripherals unplugged for a sleep measurement, GPIO0/GPIO1 lose the
+BME280 breakout's external pull-ups and GPIO10 loses the panel driving BUSY, so
+all three float. GPIO2 is permanently unconnected by design:
+
+```c
+// before esp_deep_sleep_start()
+pinMode(8, OUTPUT); digitalWrite(8, HIGH);   // strap high, blue LED off
+gpio_hold_en((gpio_num_t)8);
+
+pinMode(2,  INPUT_PULLUP);                   // strapping, must be high
+pinMode(0,  INPUT_PULLUP);                   // I2C idles high
+pinMode(1,  INPUT_PULLUP);
+pinMode(10, INPUT_PULLDOWN);                 // BUSY idles low
+
+gpio_deep_sleep_hold_en();
+```
+
+Change one thing at a time and re-measure on the shunt between each — the rig
+repeats to ~20 µA over two minutes, so it resolves anything worth having.
+
+**Do not expect this to find 1.8 mA.** Floating-pin leakage is a µA-scale
+cleanup. It is worth doing so the number is trustworthy, but if the board is
+still at milliamps afterwards the cause is elsewhere.
+
 ## Panel constraints
 
 Hardware limits, not preferences. They shape the sleep strategy.
@@ -308,7 +380,12 @@ oversampling or filtering.
 5. **Measure current** on the 3V3 rail, during refresh and idle. These numbers
    size the solar panel.
 6. **Enable deep sleep** last. Confirm the boot counter increments and min/max
-   persist, proving RTC memory works.
+   persist, proving RTC memory works. **Done 2026-08-30** — `boot #3` with
+   `tMin`/`tMax` carried across, read over the GPIO20 mirror.
+
+Step 6 was in fact done before step 5: deep sleep went on while the 3V3 current
+measurements were still outstanding. Harmless here, but it means the sleep
+figures below are still the datasheet estimate and not this board's.
 
 ### Expected current
 
@@ -318,6 +395,10 @@ oversampling or filtering.
 | During e-paper refresh | +10–20 mA for ~2 s |
 | Idle between refreshes | ~0 mA for the panel |
 | Deep sleep, SuperMini board | 40–100 µA |
+
+**These are datasheet estimates, not measurements of this board.** A shunt
+measurement on 2026-09-03 was discarded for a ground-loop fault; see
+[solar_node.md](solar_node.md) for the method and the rule that came out of it.
 
 Sleep current is the figure that matters. A bare C3 module sleeps at ~5 µA; the
 SuperMini's regulator quiescent current is what raises it.

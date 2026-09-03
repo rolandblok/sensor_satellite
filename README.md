@@ -23,9 +23,10 @@ a refresh, and nothing at all while displaying.
 | ESP32-C3 + BME280 + e-paper, USB powered | **current** — [proto_epaper_esp32c3.md](proto_epaper_esp32c3.md) |
 | Supercapacitor + solar | **bench testing** — [solar_node.md](solar_node.md) |
 
-Working now: sensor reads validated, CSV logging over USB serial, e-paper
-driver initialising with the correct panel class. Not yet done: end-to-end
-refresh on the physical panel, current measurements, deep sleep.
+Working now: sensor reads validated, CSV logging over USB serial and over the
+GPIO20 mirror, e-paper refreshing on the physical panel, and deep sleep with RTC
+memory verified. Not yet done: current measurements on the 3V3 rail, and a full
+run on cap power with USB disconnected.
 
 ## Hardware
 
@@ -87,6 +88,36 @@ arduino-cli compile --upload -p COM5 \
 
 `CDCOnBoot=cdc` is required — the C3 has no USB-serial chip, and without it
 `Serial` output goes nowhere.
+
+### Deep sleep costs you casual reflashing
+
+With `USE_DEEP_SLEEP 1` the node is awake for about 5 s out of every `CYCLE_S`
+(300 s by default) — a 1.7% duty cycle. For the rest of it **COM5 does not
+exist**. The C3 has no USB-serial chip; the port is the on-chip USB-Serial-JTAG
+peripheral, and deep sleep unpowers it. `arduino-cli board list` shows only the
+logger's COM3.
+
+That breaks the normal upload, which opens the port and pulses DTR/RTS to force
+download mode (the `Hard resetting via RTS pin` at the end of a successful
+flash). No port, nothing to open, nothing to reset.
+
+Two ways round it:
+
+**BOOT button — deterministic.** Hold BOOT (GPIO9) while power-cycling, then
+release. GPIO9 low at boot puts the ROM in download mode, where it waits
+indefinitely with the port enumerated and the sketch never running. Upload
+normally from there. On cap power this means pulling the VCAP wire off `5V`
+first and plugging USB with BOOT held — otherwise it is not a fresh power-on and
+the strapping is never sampled.
+
+**Catch the wake window.** Less fragile than the duty cycle suggests: you only
+have to win the first instant, because once esptool opens the port and asserts
+reset the sketch is gone and the pending sleep never happens. Poll for the port
+and fire the upload the moment it appears.
+
+Either way, **reflashing wipes RTC memory** — `bootCount` returns to 0 and
+`tMin`/`tMax` reset. Change `CYCLE_S` before starting a discharge run, not
+partway through one.
 
 ## Contents
 

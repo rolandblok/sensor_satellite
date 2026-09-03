@@ -35,11 +35,20 @@ and go straight to the connector — they are not on the header either.
 | GPIO5 | ADC2_0 | MISO, MTDI | default SPI MISO; ADC2 unusable with WiFi |
 | GPIO6 | — | MOSI, MTCK | default SPI MOSI |
 | GPIO7 | — | SS, MTDO | default SPI chip select |
-| GPIO8 | — | — | **strapping** — must be HIGH at boot; onboard blue LED, active LOW |
+| GPIO8 | — | — | **strapping** — must be HIGH at boot; onboard blue LED, **active HIGH** |
 | GPIO9 | — | — | **strapping** — BOOT button; LOW at boot enters download mode |
 | GPIO10 | — | — | free, safe, no ADC |
 | GPIO20 | — | U0RXD | UART0 RX by default; used here as UART0 **TX** for the log mirror |
 | GPIO21 | — | U0TXD | UART0 TX — free when `Serial` is USB-CDC, but the ROM boot log still prints here |
+
+**The blue LED on GPIO8 is active HIGH, measured 2026-09-03.** This table said
+active LOW until then, and it was wrong. The LED's anode is on the pin: driving
+GPIO8 high lights it, high-Z and low both leave it dark. It was seen lit, so the
+polarity is not in doubt; the current it costs is not yet reliably measured. So the pin wants leaving alone in sleep —
+a pull-up would source current straight through the LED, and holding it low
+would work but the hold survives the wake reset, and this pin must be high at
+boot. Note the strapping requirement means the LED flashes briefly at every
+boot; that is normal and not a fault.
 
 Arduino's I²C default is `SDA=8, SCL=9`, which lands on both strapping pins.
 Call `Wire.setPins()` before `Wire.begin()` and move it — this project uses

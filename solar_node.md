@@ -374,6 +374,47 @@ The charge current was derived from the cap rather than an ammeter:
 at about 7 h of this light per day — marginal indoors, but indoor light is not
 the deployment case. Overcast daylight outdoors is typically 10–100× brighter.
 
+### Current measurement by PSU and shunt — method, 2026-09-03
+
+The cap is a poor ammeter: `I = C·dV/dt` needs C, and C is the least known thing
+about this part. A bench supply removes it from the loop. Lab PSU into the
+node's `5V` or `3V3` pin, **15 Ω shunt low-side** in the ground return, DS1054Z
+CH1 across it, driven over LAN.
+
+Low-side is not a preference. The scope's probe grounds are earthed, so a
+single-ended probe across a high-side shunt shorts the supply. Probe tip on the
+node's ground rail, clip on PSU (−).
+
+**The witness logger and this shunt cannot coexist. This is the important
+rule.** The logger is earthed through its USB to the PC; the scope clip and the
+PSU negative are earthed too. The shared GND wire closes a loop between two
+mains-earth references, and an ordinary few tens of millivolts of offset across
+15 Ω reads as a fat, steady, entirely fictional current — 24 mV was 1.6 mA.
+
+It is convincing because it does not behave like an artifact: it stays identical
+across power injection points, across peripheral states, and with the C3 held in
+reset. **The tell is that it persists with the node disconnected entirely.**
+Current that flows with nothing connected is not the node's current.
+
+So: **remove all three logger wires — GND, A0 and D7 — before any shunt
+measurement.** Not just the data line. The logger needs a shared ground to watch
+VCAP and that shared ground is exactly what the shunt cannot tolerate; they are
+two ways of measuring the same thing that corrupt each other. Use one or the
+other, never both.
+
+**A first set of measurements taken on 2026-09-03 was discarded for exactly this
+reason** — every absolute figure in it was inflated by the loop. Method notes
+worth keeping from that attempt:
+
+* `VAVG` under `:ACQ:TYPE NORM` reads high when the signal occupies few vertical
+  codes — 1.75× at 100 mV/div. Use `:ACQ:TYPE AVER` for any small DC level.
+* Zero each vertical range with `:CHAN1:COUP GND` and subtract; the residual was
+  0.8 mV at 20 mV/div, 4.0 mV at 100 mV/div.
+* Check the signal fits the screen. At 5 mV/div a 28 mV level clipped and read
+  22.9 mV. Query `:MEAS:ITEM? VMAX,CHAN1` as a guard.
+* Sanity-check any current against a disconnected-node reading. It should be
+  zero. If it is not, the rig is measuring itself.
+
 ## Witness logger
 
 `Serial` on the node is native USB-CDC, so it disappears the moment USB is
@@ -587,7 +628,7 @@ of the range and the whole region below dropout where the node is not running.
 
 ---
 
-## Where this left off — 2026-08-30
+## Where this left off — 2026-09-03
 
 Working and verified on hardware:
 
@@ -601,6 +642,21 @@ Working and verified on hardware:
   countdown to the node's next row and the delta between the two.
 * Both ADCs calibrated against a DMM at 4.81 V — node 4.819 V, logger 4.816 V.
   Last checked 2026-08-30: node 4.718 V, logger 4.712 V, 6 mV apart.
+* **Deep sleep on** since 2026-08-30 (`USE_DEEP_SLEEP 1`). RTC memory confirmed
+  for the first time — `bootCount` increments across real sleep/wake cycles and
+  `tMin`/`tMax` survive them — closing step 6 of the bring-up list in
+  [proto_epaper_esp32c3.md](proto_epaper_esp32c3.md). The wake window is ~5 s and
+  the whole boot burst reaches the logger over GPIO20 intact, nothing dropped.
+
+* **Cap-only run done, 2026-08-30.** USB out, VCAP on the `5V` pin, deep sleep
+  at `CYCLE_S 300`. The node cycled cleanly from 4.7 V down to **3.04 V** — well
+  below the 3.6 V dropout this file assumed — at a steady 304 s spacing with no
+  reset loop. That is the first measured brownout figure the project has.
+* **Sleep current is not yet known.** The 2026-09-03 shunt attempt was thrown
+  out — a ground loop through the witness logger's shared GND added a fictional
+  1.6 mA to every reading. See *Current measurement by PSU and shunt* above for
+  the method and the rule that came out of it. Redo pending, logger fully
+  disconnected.
 
 Bench gotchas worth remembering:
 
@@ -609,26 +665,56 @@ Bench gotchas worth remembering:
   port — it looks like a dead cable and is not.
 * Node ADC repeatability is **±0.3%** (five boots spread 4.782–4.811 V). That is
   the calibration limit, not the meter.
-* `LOG_S` is dead code: `loop()` delays on `CYCLE_S`, so logging is one row per
-  300 s. Too slow for a discharge run — lower `CYCLE_S` or wire up `LOG_S`
-  before the next capture. The logger's countdown learns the new period on its
-  own, so nothing needs reflashing there.
+* `LOG_S` is dead code — nothing reads it. With `USE_DEEP_SLEEP 1` the node logs
+  one row per wake, so `CYCLE_S` alone sets the rate. Deliberately left at 300 s
+  on 2026-08-30: deep sleep stretches the run from ~3 minutes to ~30, so the row
+  rate is no longer what limits the curve. The logger's countdown learns the
+  period from the gaps between rows, so nothing needs reflashing there.
+* **Deep sleep costs casual reflashing.** COM5 is the C3's on-chip
+  USB-Serial-JTAG, unpowered in sleep, so the port only exists ~5 s per cycle and
+  `board list` shows just the logger. Reflashing wants the BOOT button — see the
+  [README](README.md). It also wipes RTC memory, so change `CYCLE_S` before a
+  discharge run rather than partway through one.
 * An idle I²C bus sits **high** on both lines. Both low means no pull-ups, no
   power, or a short — not a wrong address. The logger prints the idle levels at
   boot for exactly this reason.
 * The D1 mini's IRAM is at 95% with U8g2 and SoftwareSerial both linked in.
   There is little headroom left on that board.
+* **A ground fault between the boards looks like everything except a ground
+  fault.** On 2026-08-30 the logger's OLED died whenever the node ran from the
+  cap and recovered on USB, with only GND, A0 and the D7 link between them. On
+  USB the node's return current goes home through the host; on cap power all of
+  it — 25 mA idle, more on refresh — crosses that one joint. Suspicion fell on
+  the D7 line first and a test with D7 removed cleared it. It was the ground.
+* **The two Vcap instruments disagree on cap power, and it is not the ADC.**
+  Node 4.052 V against logger 4.143 V while awake, ~91 mV apart, having agreed
+  inside 5 mV on USB. That is 2.2%, far outside the ±0.3% ADC repeatability. The
+  node reads through the VCAP wiring while drawing 25 mA, so 91 mV / 25 mA ≈
+  3.6 Ω of wire and contact resistance separates the tap points. **`VDIV_CAL`
+  cannot be checked on cap power until both instruments tap the same physical
+  point.**
+* **Scope `VAVG` lies on `NORM` acquisition** for small DC levels — 1.75× high at
+  100 mV/div. Use `:ACQ:TYPE AVER` and zero each range with `:CHAN1:COUP GND`.
 
 Next, in order:
 
-1. **Lower `CYCLE_S`** so a discharge run produces a usable curve.
-2. **Re-check `VDIV_CAL` on cap power.** Everything so far was measured with the
-   node on USB. The C3's ADC reference is efuse-calibrated and largely
-   supply-independent, but "largely" deserves one confirming reading.
-3. **Leakage floor and sleep current.** Pull the A0 wire first. Consider logging
-   to the C3's own flash instead, so no wire crosses to a USB-powered board.
-4. Then the open items below — capacitance against discharge rate, ESR, and Isc
-   outdoors on an overcast day.
+1. **Redo the sleep-current measurement cleanly** — PSU and 15 Ω low-side shunt,
+   **all three logger wires off**. Confirm zero with the node disconnected before
+   trusting any reading. Everything below depends on this number and nothing
+   trustworthy has been measured yet.
+2. **Then split it**: peripherals on versus off, and `5V` versus `3V3` injection.
+   The second difference is the onboard regulator's quiescent current and it
+   decides whether the external HT7333 is worth fitting. Design note 8 assumed
+   the onboard part is the wasteful one; that remains untested.
+3. **Effective capacitance at load.** Still open. It needs a trustworthy current
+   to divide `dV/dt` into, so it waits on step 1. The 3.8–5.6 F measured while
+   charging is rate- and voltage-dependent and two discharge runs at different
+   voltages cannot be compared without correcting C for each.
+4. **Leakage floor**, with the A0 wire pulled — a DMM at 10 MΩ loads the cap 16×
+   less than the 620 kΩ witness branch.
+5. **Re-check `VDIV_CAL`** once both instruments tap the same point — see the
+   3.6 Ω tap-point problem above.
+6. Then the open items below — ESR, and Isc outdoors on an overcast day.
 
 **The clamp is still not fitted.** Do not leave this rig charging in a window
 unattended.
