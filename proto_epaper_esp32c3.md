@@ -154,6 +154,18 @@ the port exists for only ~5 s per `CYCLE_S`, so reflashing wants the BOOT button
 1–3 mA. That is 30× the target sleep budget and will dominate the solar design.
 Desolder it before the battery build.
 
+**And this board has a second one.** It is a SuperMini **Plus V2**: GPIO8 carries
+a WS2812B RGB pixel rather than a plain blue LED, and the pixel's controller
+draws ~1 mA from 3V3 in every state, black included. Firmware cannot switch it
+off. Same remedy, same pass — see [gpio.md](gpio.md).
+
+**Or change board.** A Seeed XIAO ESP32-C3 is the same silicon with no user LED
+and no pixel, at a published 43–44 µA. It brings out 11 GPIO instead of 13 —
+GPIO0 and GPIO1 are missing — so the I²C bus moves to `FORCE_SDA 20` /
+`FORCE_SCL 2` and every other pin in this file stays where it is. That only fits
+if the GPIO20 log mirror goes, which means logging to flash instead. Full pin
+map, strapping and boot reasoning in [gpio_xiao.md](gpio_xiao.md).
+
 ---
 
 ## Firmware
@@ -275,7 +287,7 @@ and hold through the RTC domain; the rest are digital pads and need
 | Pin | Requirement | Safe idle |
 | --- | ----------- | --------- |
 | GPIO2 | HIGH at boot | pull-up, never pull-down |
-| GPIO8 | HIGH at boot; onboard blue LED, active LOW | drive/pull **high** — also keeps the LED dark |
+| GPIO8 | HIGH at boot; onboard WS2812B pixel, ~1 mA in any state | leave **high-Z** — a pull-up sources into the pixel's input, and no pin state saves the ~1 mA |
 | GPIO9 | HIGH at boot (LOW = download mode) | has the BOOT button's external pull-up; leave it |
 
 ### The rules
@@ -298,23 +310,27 @@ all three float. GPIO2 is permanently unconnected by design:
 
 ```c
 // before esp_deep_sleep_start()
-pinMode(8, OUTPUT); digitalWrite(8, HIGH);   // strap high, blue LED off
-gpio_hold_en((gpio_num_t)8);
-
+// GPIO8 is deliberately absent: it is the WS2812B data line, the pixel draws
+// its ~1 mA from 3V3 regardless, and any pull here only fights its input.
 pinMode(2,  INPUT_PULLUP);                   // strapping, must be high
 pinMode(0,  INPUT_PULLUP);                   // I2C idles high
 pinMode(1,  INPUT_PULLUP);
 pinMode(10, INPUT_PULLDOWN);                 // BUSY idles low
 
+gpio_hold_en((gpio_num_t)2);                 // per pin
+gpio_hold_en((gpio_num_t)0);
+gpio_hold_en((gpio_num_t)1);
+gpio_hold_en((gpio_num_t)10);
 gpio_deep_sleep_hold_en();
 ```
 
 Change one thing at a time and re-measure on the shunt between each — the rig
 repeats to ~20 µA over two minutes, so it resolves anything worth having.
 
-**Do not expect this to find 1.8 mA.** Floating-pin leakage is a µA-scale
-cleanup. It is worth doing so the number is trustworthy, but if the board is
-still at milliamps afterwards the cause is elsewhere.
+**Do not expect this to find milliamps.** Floating-pin leakage is a µA-scale
+cleanup. It is worth doing so the number is trustworthy, but the board's two
+known always-on loads — the power LED and the GPIO8 WS2812B pixel, ~1 mA each —
+are hardware, not pin state, and only desoldering removes them.
 
 ## Panel constraints
 
@@ -394,14 +410,17 @@ figures below are still the datasheet estimate and not this board's.
 | Active, radios off, no refresh | 20–25 mA |
 | During e-paper refresh | +10–20 mA for ~2 s |
 | Idle between refreshes | ~0 mA for the panel |
-| Deep sleep, SuperMini board | 40–100 µA |
+| Deep sleep, standard SuperMini | 40–100 µA |
+| Deep sleep, **this** Plus V2 board, unmodified | 0.6–1.5 mA — the GPIO8 pixel |
 
 **These are datasheet estimates, not measurements of this board.** A shunt
 measurement on 2026-09-03 was discarded for a ground-loop fault; see
 [solar_node.md](solar_node.md) for the method and the rule that came out of it.
 
-Sleep current is the figure that matters. A bare C3 module sleeps at ~5 µA; the
-SuperMini's regulator quiescent current is what raises it.
+Sleep current is the figure that matters. A bare C3 module sleeps at ~5 µA. On a
+standard SuperMini the regulator's quiescent current is what raises it; on this
+Plus V2 the WS2812B on GPIO8 swamps both and has to come off before any of the
+rest is worth measuring.
 
 ---
 

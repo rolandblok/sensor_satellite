@@ -7,6 +7,7 @@ low-Iq LDO → ESP32-C3 + BME280 + 2.9" e-paper.
 | ---- | ---- |
 | `solar_node.pdf` / `.svg` | rendered schematic, nothing needed to view it |
 | `solar_node.drawio` | block diagram and the bench-test wiring sheets |
+| `solar_node_xiao.drawio` | the XIAO variant: TL431 clamp, no external regulator |
 | `tools/gen_schematic.py` | the circuit as code; regenerates the schematic |
 | `tools/scope_log.py` | logs DC measurements off the DS1054Z over LAN to CSV |
 | this file | design notes and measurements, renders on GitHub |
@@ -183,6 +184,62 @@ bright sun, and the cap is rated 5.5 V absolute. With the node asleep at ~50 µA
 against 400 mA available, the panels win: a sunny afternoon would push the cap
 past its rating. Doubling the panel count makes this more urgent, not less.
 
+**3a. The clamp shunts the panels, not the rail.** A shunt across VCAP has to
+sink the whole panel current, because the load is ~50 µA: `400 mA × 5.1 V ≈ 2 W`
+continuously, all sunny afternoon, needing a TO-220 part and somewhere for the
+heat to go. Shunting the panels costs almost nothing — a solar cell is a current
+source, shorting it is safe, its voltage collapses, and dissipation is
+`I² × Rds(on) ≈ 0.2² × 0.05 Ω ≈ 2 mW` per device. D1/D2 already stop the cap
+draining backwards into a shorted panel; that is what design note 2 put them
+there for.
+
+Three details decide the circuit:
+
+* **Two MOSFETs, not one.** The panels merge only *after* their diodes, so there
+  is no common pre-diode node to short. Both gates come off the same driver.
+* **The inversion is not optional.** A TL431 pulls its cathode LOW when the
+  sensed voltage is HIGH, and the shunt gates need to go HIGH. One PNP fixes it.
+* **Gate drive comes from VCAP, not from the panel.** Drive the gates off the
+  panel and the circuit is self-defeating: shorting the panel removes the
+  voltage holding the gate on, and it oscillates through its linear region.
+
+**Part choice.** `TL431AIZ` — TO-92, A grade, and `I` for −40…+85 °C. The grade
+barely matters (±1% of 5.1 V is 51 mV against 500 mV of headroom, and the trip
+point is trimmed on the bench anyway); the **temperature range does**, because
+cold and bright is a real combination here. A clear February day is exactly when
+the panels are at full output and a commercial-grade part is outside its rated
+range, and a reference that drifts low starts stealing charge on the sunniest
+winter day of the year.
+
+**Divider — and the target is 5.2 V, not 5.1 V.** Design note 9 sets the
+threshold: USB at 5.25 V less a 0.2 V Schottky drop puts VCAP at ~5.05 V, so a
+5.1 V clamp would shunt continuously whenever the node is on USB. The cap is
+rated 5.5 V, so 5.2 V still leaves 300 mV of margin.
+
+`Vclamp = 2.495 × (1 + R1/R2)`, so R1 = R2 gives 4.99 V ideal — but the TL431's
+~3 µA reference current flows out of the divider tap, so R1 carries more than R2
+and the real trip point sits higher. With **47 kΩ / 47 kΩ** that lands at
+**≈5.13 V** and draws **53 µA standing**. Trim R1 up by about 1.2 kΩ to reach
+5.2 V, or just fit 47 k/47 k, measure, and add the series resistor the meter asks
+for. That offset is fixed and measurable per part, which is why initial reference
+tolerance barely matters here.
+
+The obvious 10 k/10 k draws 250 µA — against design note 7's 50–100 µA leakage
+floor that would triple the floor, and the floor is what sets the minimum light
+level at which the cap charges at all.
+
+A **TLV431** would be better still: 1.24 V reference and ~150 nA reference
+current instead of ~3 µA, so 1 MΩ / 316 kΩ gives ≈5.16 V at under 4 µA — the same
+class as the sense divider rather than 13× it, and with the reference-current
+offset small enough to ignore. Worth searching for before settling for the TL431.
+
+**Not a zener.** The block diagram offers "TL431 or zener" as equals and they are
+not. A zener's knee is soft — a 5.1 V part leaks milliamps well below 5.1 V — and
+tolerance is ±5%, so it could start stealing charge at 4.5 V, inside the normal
+working range. The sharp threshold is the entire reason to use a shunt reference.
+
+**None of this is built.** The clamp has never been fitted, on either board.
+
 **4. Usable energy is charge, not ½CV².** The LDO drops out around 3.6 V, so
 only `4 F × (4.6 − 3.6) = 4 C` is usable — about 13 J at 3.3 V, not the 60 J the
 raw capacitor figure suggests.
@@ -260,6 +317,25 @@ external LDO entirely. The external LDO only earns its place in the final build,
 feeding `3V3` directly with the onboard regulator and power LED desoldered.
 Until those are removed, optimising the external part is pointless: the board's
 own 40–100 µA dwarfs the difference between a 1.6 µA and a 4 µA regulator.
+
+**8b. The XIAO variant deletes the external LDO instead.** On a Seeed XIAO
+ESP32-C3 there is no power LED and no RGB pixel to desolder, so note 8's reason
+for fitting an external regulator — the board's own always-on loads dwarfing the
+difference between a 1.6 µA and a 4 µA part — loses its force. VCAP feeds the
+`5V` pin and the onboard 700 mA regulator makes 3V3, permanently. See
+`solar_node_xiao.drawio` and [gpio_xiao.md](gpio_xiao.md).
+
+Feeding `3V3` directly is not an alternative there: VCAP runs 4.6 V down to
+~3.0 V, and anything above 3.6 V would exceed the pin's rating. Skipping the
+external LDO therefore *means* using the onboard one.
+
+Three unknowns come with that, and all three are measurements, not opinions: the
+onboard regulator's quiescent current, its dropout (which sets the brownout
+point the way 3.04 V does on the SuperMini), and **what the LiPo charge IC draws
+with nothing on B+/B−**, since it shares the `5V` pin. Seeed's published 43–44 µA
+deep sleep may well be a `3V3` or battery-pad figure that excludes both. Step 3
+of the plan — `5V` versus `3V3` injection — answers the first two on either
+board.
 
 **9. USB is a third source, not a special case.** The bench rule "never connect
 the panel and USB together" exists only because the bench rig ties VCAP straight
@@ -657,6 +733,16 @@ Working and verified on hardware:
   1.6 mA to every reading. See *Current measurement by PSU and shunt* above for
   the method and the rule that came out of it. Redo pending, logger fully
   disconnected.
+* **The board is a SuperMini Plus V2 and GPIO8 carries a WS2812B, identified
+  2026-09-03.** Not a blue LED. The pixel's controller is powered from 3V3
+  independently of the pin and draws **~0.6–1.5 mA in every state, black
+  included**; published deep-sleep figures are ~600 µA–1.5 mA for the Plus
+  against ~43 µA for the standard board. No firmware setting touches it — high-Z,
+  a pull, a latch, an all-black frame, none of them unpower the die. This is a
+  known property of the variant, not yet a measurement of this board, and the
+  1.86 mA sleep floor it would explain came out of the discarded ground-loop
+  session. Take it as a load to remove before the redo, not as the answer.
+  Details in [gpio.md](gpio.md).
 
 Bench gotchas worth remembering:
 
@@ -702,19 +788,26 @@ Next, in order:
    **all three logger wires off**. Confirm zero with the node disconnected before
    trusting any reading. Everything below depends on this number and nothing
    trustworthy has been measured yet.
-2. **Then split it**: peripherals on versus off, and `5V` versus `3V3` injection.
-   The second difference is the onboard regulator's quiescent current and it
+2. **Bracket the GPIO8 pixel, then remove it.** Take the clean sleep reading with
+   the WS2812B fitted, lift it or cut its 3V3 feed, and take it again. The
+   difference is the pixel and it is expected to be ~1 mA — the largest single
+   item on the board and unreachable from firmware. Doing it as a before/after
+   rather than straight to the desoldering iron is what turns a datasheet claim
+   about the variant into a number for this board. Take the power LED off in the
+   same pass, measuring between the two so each is attributed separately.
+3. **Then split what is left**: peripherals on versus off, and `5V` versus `3V3`
+   injection. The second difference is the onboard regulator's quiescent current and it
    decides whether the external HT7333 is worth fitting. Design note 8 assumed
    the onboard part is the wasteful one; that remains untested.
-3. **Effective capacitance at load.** Still open. It needs a trustworthy current
+4. **Effective capacitance at load.** Still open. It needs a trustworthy current
    to divide `dV/dt` into, so it waits on step 1. The 3.8–5.6 F measured while
    charging is rate- and voltage-dependent and two discharge runs at different
    voltages cannot be compared without correcting C for each.
-4. **Leakage floor**, with the A0 wire pulled — a DMM at 10 MΩ loads the cap 16×
+5. **Leakage floor**, with the A0 wire pulled — a DMM at 10 MΩ loads the cap 16×
    less than the 620 kΩ witness branch.
-5. **Re-check `VDIV_CAL`** once both instruments tap the same point — see the
+6. **Re-check `VDIV_CAL`** once both instruments tap the same point — see the
    3.6 Ω tap-point problem above.
-6. Then the open items below — ESR, and Isc outdoors on an overcast day.
+7. Then the open items below — ESR, and Isc outdoors on an overcast day.
 
 **The clamp is still not fitted.** Do not leave this rig charging in a window
 unattended.

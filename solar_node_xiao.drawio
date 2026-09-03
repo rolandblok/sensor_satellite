@@ -1,0 +1,108 @@
+<mxfile host="65bd71144e">
+    <diagram name="Solar node — XIAO variant" id="solar-node-xiao">
+        <mxGraphModel dx="1350" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1150" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+
+                <mxCell id="title" value="sensor satellite — solar / supercap chain, XIAO ESP32-C3 variant" style="text;html=1;fontSize=24;fontStyle=1;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="26" width="1000" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" value="2 x 5 V panel (parallel) → blocking diodes → 5.5 V 4 F supercap → &lt;b&gt;XIAO onboard LDO&lt;/b&gt; → ESP32-C3 + BME280 + 2.9&quot; e-paper&amp;nbsp; ·&amp;nbsp; TL431 clamp shunts the &lt;b&gt;panels&lt;/b&gt;, no external regulator" style="text;html=1;fontSize=13;fontColor=#666666;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="62" width="1300" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="unbuilt" value="&lt;b&gt;UNBUILT.&lt;/b&gt; This variant exists on paper only. The node runs on an ESP32-C3 SuperMini and the clamp has never been fitted on either board." style="text;html=1;fontSize=12;fontColor=#b85450;align=left;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="88" width="1300" height="22" as="geometry"/>
+                </mxCell>
+
+                <mxCell id="zone_harvest" value="HARVEST" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=11;fontColor=#7f6000;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="130" width="340" height="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="zone_store" value="STORE &amp;amp; PROTECT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=11;fontColor=#1f4e79;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="420" y="130" width="340" height="660" as="geometry"/>
+                </mxCell>
+                <mxCell id="zone_load" value="LOAD — no external regulator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#82b366;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=11;fontColor=#255d1c;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="790" y="130" width="760" height="530" as="geometry"/>
+                </mxCell>
+
+                <mxCell id="sp1" value="&lt;b&gt;SOLAR PANEL 1&lt;/b&gt;&lt;br&gt;5 V / 200 mA / 1 W&lt;br&gt;&lt;font color=&quot;#7f6000&quot;&gt;Voc up to ~6.5 V&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;+&lt;/b&gt; red → D1&lt;/font&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;−&lt;/b&gt; black → GND" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="75" y="170" width="155" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="d1" value="&lt;b&gt;D1&lt;/b&gt;&lt;br&gt;1N5819&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;drop 0.3 V&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="255" y="180" width="110" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="sp2" value="&lt;b&gt;SOLAR PANEL 2&lt;/b&gt;&lt;br&gt;5 V / 200 mA / 1 W&lt;br&gt;&lt;font color=&quot;#7f6000&quot;&gt;Voc up to ~6.5 V&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#cc0000&quot;&gt;&lt;b&gt;+&lt;/b&gt; red → D2&lt;/font&gt;&amp;nbsp;&amp;nbsp;&lt;b&gt;−&lt;/b&gt; black → GND" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="75" y="275" width="155" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="d2" value="&lt;b&gt;D2&lt;/b&gt;&lt;br&gt;1N5819&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;drop 0.3 V&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="255" y="285" width="110" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="shunt" value="&lt;b&gt;M1 / M2 — SHUNT MOSFETs&lt;/b&gt;&lt;br&gt;one across each panel, &lt;b&gt;before&lt;/b&gt; the diodes&lt;br&gt;logic-level N-ch, ≥1 A, Rds(on) &amp;lt; 100 mΩ&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;AO3400A / IRLML2502 · 100 kΩ gate pulldown&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#255d1c&quot;&gt;shorting a panel is safe — it is a current source&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="75" y="380" width="290" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="usb" value="&lt;b&gt;USB 5 V&lt;/b&gt;&lt;br&gt;flash / debug&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;hot-pluggable&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="75" y="495" width="155" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="d3" value="&lt;b&gt;D3&lt;/b&gt;&lt;br&gt;1N5819&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;+ 22 Ω inrush&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="255" y="495" width="110" height="70" as="geometry"/>
+                </mxCell>
+
+                <mxCell id="rail" value="&lt;b&gt;VCAP rail&lt;/b&gt;&amp;nbsp; ~4.6 V&lt;br&gt;&lt;font color=&quot;#ffffff&quot;&gt;clamped to ~5.2 V · brownout ~3.0 V&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#000000;fontColor=#ffffff;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="445" y="170" width="290" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="cap" value="&lt;b&gt;SUPERCAP&lt;/b&gt;&lt;br&gt;5.5 V · 4 F&lt;br&gt;2 x 2.7 V cells in series&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;5.5 V is absolute max — hence the clamp&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="445" y="250" width="290" height="85" as="geometry"/>
+                </mxCell>
+                <mxCell id="bal" value="&lt;b&gt;CELL BALANCING&lt;/b&gt;&amp;nbsp; 2 x 100 kΩ&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;27 µA — omit only if already fitted&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="445" y="360" width="290" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="clamp" value="&lt;b&gt;OVERVOLTAGE CLAMP&lt;/b&gt;&amp;nbsp; ~5.2 V&lt;br&gt;&lt;br&gt;&lt;b&gt;TL431AIZ&lt;/b&gt; TO-92, A grade, −40…+85 °C&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;R1 / R2 = 47 kΩ / 47 kΩ → trips ≈5.13 V&lt;br&gt;53 µA standing · trim R1 +1.2 kΩ for 5.2 V&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;PNP inverter&lt;/b&gt; BC557 / MMBT3906&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;TL431 cathode goes LOW when Vcap is HIGH;&lt;br&gt;the gates must go HIGH — hence the inversion&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#255d1c&quot;&gt;gate drive comes from VCAP, not the panel,&lt;br&gt;so collapsing the panel cannot starve it&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;verticalAlign=top;spacingTop=6;" parent="1" vertex="1">
+                    <mxGeometry x="445" y="440" width="290" height="215" as="geometry"/>
+                </mxCell>
+                <mxCell id="div" value="&lt;b&gt;VCAP SENSE&lt;/b&gt;&lt;br&gt;1 MΩ / 1 MΩ + 100 nF at the tap&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;÷2 · 2.3 µA at 4.6 V · 50 ms settling&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="445" y="675" width="290" height="80" as="geometry"/>
+                </mxCell>
+
+                <mxCell id="xiao" value="&lt;b&gt;SEEED XIAO ESP32-C3&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;radios never initialised · no user LED, no RGB pixel&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;5V&lt;/b&gt; ← VCAP&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;b&gt;3V3&lt;/b&gt; → peripherals&lt;br&gt;&lt;br&gt;&lt;b&gt;D0&lt;/b&gt; GPIO2&amp;nbsp; SCL&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;b&gt;D7&lt;/b&gt; GPIO20&amp;nbsp; SDA&lt;br&gt;&lt;b&gt;D1&lt;/b&gt; GPIO3&amp;nbsp; VSENSE&amp;nbsp;&amp;nbsp;&lt;b&gt;D10&lt;/b&gt; GPIO10&amp;nbsp; BUSY&lt;br&gt;&lt;b&gt;D2&lt;/b&gt; GPIO4&amp;nbsp; CLK&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;b&gt;D6&lt;/b&gt; GPIO21&amp;nbsp; DC&lt;br&gt;&lt;b&gt;D3&lt;/b&gt; GPIO5&amp;nbsp; RST&lt;br&gt;&lt;b&gt;D4&lt;/b&gt; GPIO6&amp;nbsp; DIN&lt;br&gt;&lt;b&gt;D5&lt;/b&gt; GPIO7&amp;nbsp; CS&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#255d1c&quot;&gt;D8 / D9 spare&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;verticalAlign=top;spacingTop=6;" parent="1" vertex="1">
+                    <mxGeometry x="820" y="175" width="310" height="270" as="geometry"/>
+                </mxCell>
+                <mxCell id="novreg" value="&lt;b&gt;EXTERNAL LDO — NOT FITTED&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;The MCP1700 / HT7333 is deleted in this variant.&lt;br&gt;VCAP goes straight to the XIAO&apos;s &lt;b&gt;5V&lt;/b&gt; pin and the&lt;br&gt;onboard 700 mA regulator makes 3V3.&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;Three unknowns come with it: the onboard LDO&apos;s Iq,&lt;br&gt;its dropout (which sets brownout), and the LiPo&lt;br&gt;charger that shares the 5V pin.&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontSize=11;verticalAlign=top;spacingTop=6;fontColor=#333333;" parent="1" vertex="1">
+                    <mxGeometry x="820" y="470" width="310" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="bme" value="&lt;b&gt;BME280&lt;/b&gt;&amp;nbsp; 0x76&lt;br&gt;T / RH / pressure&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;breakout carries the bus pull-ups —&lt;br&gt;they also hold GPIO2 high at reset&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1200" y="175" width="320" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="epd" value="&lt;b&gt;2.9&quot; E-PAPER&lt;/b&gt;&lt;br&gt;296 x 128 · SSD1680 (V2)&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;0 mA while displaying&lt;br&gt;write-only — bind SPI with MISO = −1&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1200" y="315" width="320" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="nolog" value="&lt;b&gt;NO GPIO20 LOG MIRROR&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;The D1 mini witness logger is dropped. That is what&lt;br&gt;frees GPIO20 for SDA — without it the build does not fit.&lt;br&gt;Logs go to the C3&apos;s own flash instead, which also kills&lt;br&gt;the ground loop that wrecked the 2026-09-03 shunt run.&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontSize=11;verticalAlign=top;spacingTop=6;" parent="1" vertex="1">
+                    <mxGeometry x="1200" y="460" width="320" height="120" as="geometry"/>
+                </mxCell>
+
+                <mxCell id="e_sp1_d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#cc0000;" parent="1" source="sp1" target="d1" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_sp2_d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#cc0000;" parent="1" source="sp2" target="d2" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_usb_d3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9673a6;" parent="1" source="usb" target="d3" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_d1_rail" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#cc0000;" parent="1" source="d1" target="rail" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_d2_rail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#cc0000;" parent="1" source="d2" target="rail" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_d3_rail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9673a6;" parent="1" source="d3" target="rail" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_rail_cap" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;" parent="1" source="rail" target="cap" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_cap_bal" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;" parent="1" source="cap" target="bal" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_bal_clamp" value="senses VCAP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;dashed=1;fontSize=10;" parent="1" source="bal" target="clamp" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_clamp_shunt" value="gate drive when Vcap &amp;gt; 5.2 V" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#b85450;fontSize=10;fontColor=#b85450;" parent="1" source="clamp" target="shunt" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_clamp_div" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;" parent="1" source="clamp" target="div" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_rail_xiao" value="VCAP → 5V pin" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#cc0000;fontSize=11;" parent="1" source="rail" target="xiao" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_div_xiao" value="ADC · D1 / GPIO3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;fontSize=10;" parent="1" source="div" target="xiao" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_xiao_bme" value="I²C · D0 / D7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;startArrow=classic;fontSize=11;" parent="1" source="xiao" target="bme" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e_xiao_epd" value="SPI · D2–D5, DC D6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;fontSize=11;" parent="1" source="xiao" target="epd" edge="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+                <mxCell id="note_clamp" value="&lt;b&gt;Why the clamp shunts the panels, not the rail&lt;/b&gt;&lt;br&gt;&lt;br&gt;A shunt across VCAP has to sink the whole panel current, because the load is ~50 µA:&amp;nbsp; &lt;b&gt;400 mA × 5.2 V ≈ 2 W&lt;/b&gt;, continuously, all sunny afternoon. That needs a TO-220 part and somewhere for the heat to go.&lt;br&gt;&lt;br&gt;Shunting the panels costs almost nothing. A solar cell is a current source — shorting it is safe, its voltage collapses, and dissipation is I² × Rds(on) ≈ 0.2² × 0.05 Ω ≈ &lt;b&gt;2 mW per MOSFET&lt;/b&gt;. D1/D2 already stop the cap draining backwards into a shorted panel; that is what design note 2 put them there for.&lt;br&gt;&lt;br&gt;&lt;b&gt;Two MOSFETs, not one.&lt;/b&gt; The panels merge only after their diodes, so there is no common pre-diode node to short. Both gates come off the same driver.&lt;br&gt;&lt;br&gt;&lt;b&gt;The inversion is not optional.&lt;/b&gt; A TL431 pulls its cathode LOW when the sensed voltage is HIGH, and the shunt gates need to go HIGH. One PNP fixes it. Driving the gates from a panel-derived supply instead would be self-defeating: shorting the panel removes the voltage that holds the gate on, and the thing oscillates through its linear region.&lt;br&gt;&lt;br&gt;&lt;b&gt;Hysteresis&lt;/b&gt; — a resistor from the PNP collector back to the TL431 REF pin — is polish. Chatter into a 4 F cap is harmless." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;spacingRight=12;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="630" width="700" height="440" as="geometry"/>
+                </mxCell>
+                <mxCell id="note_status" value="&lt;b&gt;What is settled and what is not&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Why this board.&lt;/b&gt; The SuperMini in hand is a &lt;b&gt;Plus V2&lt;/b&gt;: GPIO8 carries a WS2812B, not a blue LED, and its controller draws ~1 mA from 3V3 in every state including black. No pin state switches it off. The XIAO has no user LED and no pixel — published deep sleep 43–44 µA against 0.6–1.5 mA.&lt;br&gt;&lt;br&gt;&lt;b&gt;What it costs.&lt;/b&gt; GPIO0 and GPIO1 are not bonded out, so the I²C bus moves to GPIO20 (SDA) and GPIO2 (SCL). Every other signal keeps its pin. SCL takes the strapping pin because it is master-driven and nothing but a short can hold it low; SDA there could be held low by a hung slave through a reset, which is a board that will not boot.&lt;br&gt;&lt;br&gt;&lt;b&gt;Still unmeasured, and everything else waits on it:&lt;/b&gt;&lt;br&gt;· sleep current of either board, cleanly — the 2026-09-03 shunt run was thrown out for a ground loop&lt;br&gt;· the XIAO onboard LDO&apos;s quiescent current and dropout&lt;br&gt;· what the LiPo charger draws with nothing on B+/B−&lt;br&gt;· the clamp — never built, on any board&lt;br&gt;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;Do not order parts from this diagram.&lt;/b&gt; It is a block diagram, not a schematic — connectivity and values, no symbols, no ERC.&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;spacingRight=12;" parent="1" vertex="1">
+                    <mxGeometry x="790" y="680" width="760" height="390" as="geometry"/>
+                </mxCell>
+
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

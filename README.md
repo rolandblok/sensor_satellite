@@ -32,7 +32,7 @@ run on cap power with USB disconnected.
 
 | Part | Choice |
 | ---- | ------ |
-| MCU | ESP32-C3 SuperMini |
+| MCU | ESP32-C3 SuperMini — alternative: **Seeed XIAO ESP32-C3**, [gpio_xiao.md](gpio_xiao.md) |
 | Sensor | BME280 — temperature / humidity / pressure |
 | Display | Waveshare 2.9" b/w e-paper, 296×128, SSD1680 |
 | Storage | 5.5 V 4 F supercapacitor *(later)* |
@@ -60,6 +60,15 @@ that a divider would hold low on a flat cap. Full pinout in
 [gpio.md](gpio.md); pin budget, module strapping (BME280 `CSB`/`SDO`, e-paper
 `BS`) and board gotchas in
 [proto_epaper_esp32c3.md](proto_epaper_esp32c3.md).
+
+**There is an alternative board.** The SuperMini in hand turned out to be a
+**Plus V2**, whose GPIO8 carries a WS2812B costing ~1 mA in every state, black
+included, with no firmware way to switch it off. The Seeed XIAO ESP32-C3 is the
+same silicon with no user LED and no pixel. It brings out 11 GPIO instead of 13
+— GPIO0 and GPIO1 are missing — so the I²C bus moves to GPIO20/GPIO2 and
+everything else keeps its pin. Pin map, boot and strapping reasoning in
+[gpio_xiao.md](gpio_xiao.md); the matching power chain in
+`solar_node_xiao.drawio`.
 
 ## Layout
 
@@ -128,6 +137,8 @@ partway through one.
 | [`i2c_scan/`](i2c_scan/) | I²C scanner; sweeps every pin pair to find the bus |
 | [`logger_d1_mini/`](logger_d1_mini/) | D1 mini witness logger — relays the node's log on cap power, second Vcap ADC, OLED readout |
 | [`gpio.md`](gpio.md) | ESP32-C3 SuperMini pinout and this build's pin map |
+| [`gpio_xiao.md`](gpio_xiao.md) | Seeed XIAO ESP32-C3 pinout — the alternative board, and why |
+| [`solar_node_xiao.drawio`](solar_node_xiao.drawio) | power chain for the XIAO variant: TL431 clamp, no external regulator |
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |
 | [`proto_oled_d1_mini.md`](proto_oled_d1_mini.md) | earlier ESP8266 bench rig and its power analysis |

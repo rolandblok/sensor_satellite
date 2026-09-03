@@ -56,8 +56,9 @@
 // Pins parked before deep sleep.  Entering deep sleep releases the digital
 // pads to high-Z, so a level driven here does not survive without a hold; and
 // an unconnected input floating near mid-rail burns shoot-through current.
-// GPIO8 is both a strapping pin (must be HIGH at boot) and the onboard blue
-// LED (active LOW), so driving it high is required and switches the LED off.
+// GPIO8 is both a strapping pin (must be HIGH at boot) and the data line of
+// the onboard WS2812B pixel, which draws ~1 mA from 3V3 in every state. It is
+// left alone here - see parkPins() below.
 #define PARK_PINS       1
 
 #define VSENSE_PIN 3
@@ -329,8 +330,8 @@ static void runCycle() {
   refresh(true, r);
 }
 
-// GPIO8 is latched across deep sleep; the hold must be released before the pad
-// can be driven again, or writes to it are silently ignored.
+// Parked pins are latched across deep sleep; the hold must be released before a
+// pad can be driven again, or writes to it are silently ignored.
 static void unparkPins() {
 #if PARK_PINS
   // GPIO8 is included defensively: an earlier build latched it high, and that
@@ -349,12 +350,16 @@ static void unparkPins() {
 // must never be pulled low.
 static void parkPins() {
 #if PARK_PINS
-  // GPIO8 is deliberately NOT driven. Measured 2026-09-03: the blue LED's anode
-  // is on this pin, so driving it HIGH lights the LED and costs 206 uA - 1.864
-  // to 2.070 mA. gpio.md called it active LOW; it is not. High-Z is off, and a
-  // pull-up would source straight through the LED. Holding it LOW would also
-  // switch it off, but the hold survives the wake reset and GPIO8 must be high
-  // at boot, so that risks a board that will not start.
+  // GPIO8 is deliberately NOT touched. This is a SuperMini Plus V2: GPIO8 is
+  // the data line of a WS2812B RGB pixel, not an LED anode. The pixel's
+  // controller runs off 3V3 whatever the pin does and costs ~1 mA even showing
+  // black, so no pin state here saves anything - only desoldering it does. A
+  // pull-up would just source into its input, and holding it LOW is worse: the
+  // hold survives the wake reset and GPIO8 must be high at boot.
+  //
+  // An earlier comment here called it a blue LED with 206 uA of drive current,
+  // from the 2026-09-03 shunt session that was later thrown out for a ground
+  // loop. That 206 uA is unexplained, not an LED. See gpio.md.
   pinMode(2,  INPUT_PULLUP);                   // strapping, unconnected by design
   pinMode(FORCE_SDA, INPUT_PULLUP);            // I2C idles high
   pinMode(FORCE_SCL, INPUT_PULLUP);

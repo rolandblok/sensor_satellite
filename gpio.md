@@ -1,5 +1,9 @@
 # ESP32-C3 SuperMini — pinout
 
+**This is the board the build runs on.** For the alternative — a Seeed XIAO
+ESP32-C3, which has no user LED and no RGB pixel but brings out two fewer GPIO —
+see [gpio_xiao.md](gpio_xiao.md).
+
 16 castellated pins, 8 per side. USB-C at one end, ceramic antenna at the
 other. The module is an ESP32-C3FH4: single RISC-V core, 4 MB flash, native
 USB (no serial chip), 11 usable GPIO.
@@ -35,20 +39,45 @@ and go straight to the connector — they are not on the header either.
 | GPIO5 | ADC2_0 | MISO, MTDI | default SPI MISO; ADC2 unusable with WiFi |
 | GPIO6 | — | MOSI, MTCK | default SPI MOSI |
 | GPIO7 | — | SS, MTDO | default SPI chip select |
-| GPIO8 | — | — | **strapping** — must be HIGH at boot; onboard blue LED, **active HIGH** |
+| GPIO8 | — | — | **strapping** — must be HIGH at boot; onboard **WS2812B** RGB pixel, ~1 mA in any state |
 | GPIO9 | — | — | **strapping** — BOOT button; LOW at boot enters download mode |
 | GPIO10 | — | — | free, safe, no ADC |
 | GPIO20 | — | U0RXD | UART0 RX by default; used here as UART0 **TX** for the log mirror |
 | GPIO21 | — | U0TXD | UART0 TX — free when `Serial` is USB-CDC, but the ROM boot log still prints here |
 
-**The blue LED on GPIO8 is active HIGH, measured 2026-09-03.** This table said
-active LOW until then, and it was wrong. The LED's anode is on the pin: driving
-GPIO8 high lights it, high-Z and low both leave it dark. It was seen lit, so the
-polarity is not in doubt; the current it costs is not yet reliably measured. So the pin wants leaving alone in sleep —
-a pull-up would source current straight through the LED, and holding it low
-would work but the hold survives the wake reset, and this pin must be high at
-boot. Note the strapping requirement means the LED flashes briefly at every
-boot; that is normal and not a fault.
+### GPIO8 is a WS2812B, not a plain LED
+
+Identified 2026-09-03. This board is the SuperMini **Plus V2**, which replaces
+the standard board's single blue LED with one addressable RGB pixel, and GPIO8
+is that pixel's data line — not an LED anode.
+
+The distinction is the whole point. A plain LED is dark and free whenever the
+pin is not driving it. The WS2812B's controller die is powered from 3V3
+independently of the pin and **draws roughly 0.6–1.5 mA whatever colour it
+shows, black included**. [Mischianti's Plus V2
+pinout](https://mischianti.org/esp32-c3-supermini-plus-v2-high-resolution-pinout-datasheet-and-specs/)
+puts the Plus at ~600 µA–1.5 mA in deep sleep against ~43 µA for the standard
+board, and calls it unsuitable for battery use unless the pixel is removed.
+
+**No firmware setting fixes this.** High-Z, an internal pull, a latch, or
+clocking out an all-black frame — none of them unpower the controller. The fix
+is physical: lift the pixel or cut its 3V3 feed, in the same pass as the power
+LED below.
+
+This section previously said GPIO8 carried a blue LED with its anode on the pin,
+active HIGH, because the pixel was seen lit and driving GPIO8 high moved the
+shunt reading by 206 µA. A WS2812B accounts for the first without a blue LED —
+a pixel powers up with an undefined latch and lights on its own — and does not
+account for the second, since a static high on DIN is not a valid frame and so
+neither sets nor clears anything. **Treat the 206 µA as unexplained rather than
+as an LED**, and note it came out of the shunt session that was later discarded
+for a ground loop (see [solar_node.md](solar_node.md)).
+
+The conclusion for sleep is unchanged either way: **leave GPIO8 alone.** No
+pull-up — it would source into the pixel's input. No hold low — the hold
+survives the wake reset and this pin must be high at boot. The strapping
+requirement means the pixel flickers briefly at every boot; that is normal and
+not a fault.
 
 Arduino's I²C default is `SDA=8, SCL=9`, which lands on both strapping pins.
 Call `Wire.setPins()` before `Wire.begin()` and move it — this project uses
@@ -182,6 +211,10 @@ around label this pin `ADC1_5`; there is no such channel.
 
 **The power LED is always on.** Most SuperMini boards fit one drawing 1–3 mA,
 which is 30× the target sleep budget. Desolder it before the solar build.
+
+**So is the RGB pixel.** On this Plus V2 board GPIO8's WS2812B costs another
+~1 mA that no pin state can switch off — see above. Two always-on loads, one
+desoldering job.
 
 Firmware detail and module strapping (BME280 `CSB`/`SDO`, e-paper `BS`) are in
 [proto_epaper_esp32c3.md](proto_epaper_esp32c3.md).
