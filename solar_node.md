@@ -499,6 +499,90 @@ worth keeping from that attempt:
 * Sanity-check any current against a disconnected-node reading. It should be
   zero. If it is not, the rig is measuring itself.
 
+### A second run was discarded too — 2026-09-04, range change mid-log
+
+`tools/scope_log.py` against the DS1054Z over LAN, XIAO + HT7533 + BME280 +
+e-paper on a lab supply, 10 Ω in the 5 V feed, CH1 across it, `AVER` acquisition.
+It ran 696 s and produced 109 samples, and **none of them are usable in
+aggregate**, because CH1's vertical scale changed from 1 mV/div to 5 mV/div
+partway through.
+
+That is fatal rather than annoying, for a reason worth stating: **the zero offset
+is a property of the range, so a mixed-range log cannot be corrected
+afterwards.** Measured on this scope, on this channel:
+
+| Range | GND-coupled zero | Quantisation | 122 µA reads as |
+| ----- | ---------------- | ------------ | --------------- |
+| 1 mV/div | +0.079 mV | ~10 µA/step | 1.22 mV |
+| 5 mV/div | +0.213 mV | ~50 µA/step | 1.22 mV |
+
+**Use 1 mV/div for sleep current.** At 5 mV/div the quantisation is 50 µA — the
+same order as the quantity being measured, which is no measurement at all.
+
+**The logger cannot see this happen.** `scope_log.py` records `t_s` and volts and
+nothing about the instrument's state, so a range change mid-run is invisible in
+the CSV and silently corrupts it. It should query `:CHANnel<n>:SCALe?` each
+sample and either record it as a column or abort when it moves. Until it does,
+check the range before and after every run.
+
+### Shunt sizing is a compromise, not a free choice
+
+One fixed shunt cannot serve both states of this node:
+
+| Shunt | 122 µA sleep reads as | Burden at 25 mA active |
+| ----- | --------------------- | ---------------------- |
+| 10 Ω | 1.22 mV — 1 division at 1 mV/div | 0.25 V |
+| 100 Ω | 12.2 mV — comfortable | 2.5 V — browns the node out |
+| 1 kΩ | 122 mV — excellent | 25 V — impossible |
+
+**10 Ω is the right choice for a single resistor**, and the price is that sleep
+current lands at the bottom of the scope's resolution. The wake burst is the
+other half of the problem and needs its own capture: 25 mA across 10 Ω is
+250 mV, which at 1 mV/div is 250 divisions off screen. Sleep and burst are two
+measurements, not one.
+
+### The HT7533 is oscillating — 2026-09-04
+
+The thing that made every reading above disagree. Measured on the 10 Ω shunt,
+zero-corrected, node in deep sleep, twelve samples 1.5 s apart:
+
+| Measurement | Reading | Through 10 Ω |
+| ----------- | ------- | ------------ |
+| **VMIN** — the quiet floor between events | 0.6 mV | **35 µA** (sd 11) |
+| **VAVG** — what the logger records | 3.5 mV | **325 µA** (sd 14) |
+| **VMAX** — the events themselves | 10–17 mV | **1.0–1.7 mA** |
+
+**The node's sleep current is ~35–40 µA**, which is the bare-board figure and
+what the design assumed all along. The 325 µA average is not consumption, it is
+~1.5 mA spikes at roughly 360 Hz riding on a correct floor.
+
+Three things say regulator instability rather than pickup:
+
+* **The floor is stable and the excursions are one-way.** VMIN sits at 0.6 mV
+  sample after sample while VMAX wanders 10–17 mV. Symmetric EMI would move both.
+* **It responds to wire position.** Holding the 3V3 jumper close to the HT7533
+  drops the noise sharply and it settles near 2 mV. That is loop inductance
+  changing, which is a property of the circuit, not of the scope.
+* **~360 Hz is motorboating**, the classic low-frequency LDO instability, not a
+  mains harmonic (50/100 Hz) and not switching noise.
+
+The cause is a long, inductive jumper from the regulator to its load with no
+capacitance at either end. **Fit the output capacitor at the HT7533's output
+pin** — not somewhere along the wire — plus local bypass at the XIAO's `3V3`
+pin, and an input capacitor since the lab supply is also several wire-inches
+away. Twisting the 3V3 and ground wires together removes most of the remaining
+loop area. Then re-measure and expect VAVG to collapse onto VMIN.
+
+### Never read VAVG without VPP
+
+The rule this cost. Every earlier figure in this file's 2026-09-04 entries — 105,
+122, 286, 325 µA — was a mean over a signal whose peak-to-peak was four times its
+own value. **A mean without a peak-to-peak is not a measurement.** Read VMIN,
+VMAX and VPP alongside VAVG every time; when VPP is comparable to or larger than
+VAVG, the average is describing an artifact and VMIN is the number that means
+something. This generalises the earlier "check the signal fits the screen" note:
+fitting on screen is necessary and not sufficient.
+
 ## Witness logger
 
 `Serial` on the node is native USB-CDC, so it disappears the moment USB is
@@ -546,6 +630,13 @@ ESP8266's only UART with an RX is on GPIO1/GPIO3, hardwired to the CH340, and
 UART1 is TX-only.
 
 ### The A0 branch is its own divider
+
+**Why it exists at all**, since this is the question that comes back: it is a
+*second, independent* Vcap instrument. The node reads the rail on GPIO3 through
+its own divider; A0 reads the same rail through a completely separate front end,
+so the two can genuinely cross-check rather than confirm each other. And because
+the logger runs from USB, it keeps reading after the node browns out below LDO
+dropout — the part of the discharge curve the node structurally cannot report.
 
 It rides the D1 mini's onboard 220 k / 100 k:
 

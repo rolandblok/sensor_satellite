@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram name="Solar sensor node" id="solar-node">
-        <mxGraphModel dx="1350" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1150" math="0" shadow="0">
+        <mxGraphModel dx="2596" dy="1126" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1150" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -133,7 +133,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="BENCH TEST — 2 panels" id="bench-test">
-        <mxGraphModel dx="1350" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+        <mxGraphModel dx="2596" dy="1126" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
             <root>
                 <mxCell id="b0"/>
                 <mxCell id="b1" parent="b0"/>
@@ -300,7 +300,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="BENCH TEST — cap and load" id="bench-cap">
-        <mxGraphModel dx="1513" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1220" math="0" shadow="0">
+        <mxGraphModel dx="2596" dy="1126" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1220" math="0" shadow="0">
             <root>
                 <mxCell id="c0"/>
                 <mxCell id="c1" parent="c0"/>
@@ -464,7 +464,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="BENCH TEST — ESP reads Vcap" id="bench-adc">
-        <mxGraphModel dx="1513" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1480" math="0" shadow="0">
+        <mxGraphModel dx="2596" dy="1126" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1480" math="0" shadow="0">
             <root>
                 <mxCell id="a0"/>
                 <mxCell id="a1" parent="a0"/>
@@ -703,7 +703,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="LDO — TO-92 pinout" id="ldo-pinout">
-        <mxGraphModel dx="1513" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1060" math="0" shadow="0">
+        <mxGraphModel dx="2596" dy="1126" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1060" math="0" shadow="0">
             <root>
                 <mxCell id="p0"/>
                 <mxCell id="p1" parent="p0"/>
