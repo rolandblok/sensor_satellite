@@ -25,8 +25,17 @@ a refresh, and nothing at all while displaying.
 
 Working now: sensor reads validated, CSV logging over USB serial and over the
 GPIO20 mirror, e-paper refreshing on the physical panel, and deep sleep with RTC
-memory verified. Not yet done: current measurements on the 3V3 rail, and a full
-run on cap power with USB disconnected.
+memory verified. A cap-only run has been done — 4.7 V down to a 3.04 V brownout.
+
+**Sleep current, measured 2026-09-04: 40–50 µA**, on a Seeed XIAO ESP32-C3 fed
+from an HT7533 into its `3V3` pin with the onboard LED removed. Through the
+XIAO's own regulator at the `5V` pin instead it is high, so the external LDO
+stays in the design. The SuperMini's own figure is still unmeasured — its
+2026-09-03 attempt was discarded for a ground loop.
+
+Not yet done: the overvoltage clamp, unfitted on either board; logging to flash,
+which the XIAO build needs before it can do a cap-power run at all; and the
+XIAO's dropout, and so its brownout point.
 
 ## Hardware
 
@@ -98,6 +107,16 @@ arduino-cli compile --upload -p COM5 \
 `CDCOnBoot=cdc` is required — the C3 has no USB-serial chip, and without it
 `Serial` output goes nowhere.
 
+For the XIAO the FQBN differs, **and so does the CDC value**:
+
+```
+arduino-cli compile --upload -p COM7   --fqbn esp32:esp32:XIAO_ESP32C3:CDCOnBoot=default   proto_epaper_esp32c3
+```
+
+The XIAO's board definition labels `CDCOnBoot=default` as *Enabled* and
+`CDCOnBoot=cdc` as *Disabled* — the opposite of the SuperMini. Carry the wrong
+one over and the board flashes, verifies and prints nothing.
+
 ### Deep sleep costs you casual reflashing
 
 With `USE_DEEP_SLEEP 1` the node is awake for about 5 s out of every `CYCLE_S`
@@ -138,7 +157,7 @@ partway through one.
 | [`logger_d1_mini/`](logger_d1_mini/) | D1 mini witness logger — relays the node's log on cap power, second Vcap ADC, OLED readout |
 | [`gpio.md`](gpio.md) | ESP32-C3 SuperMini pinout and this build's pin map |
 | [`gpio_xiao.md`](gpio_xiao.md) | Seeed XIAO ESP32-C3 pinout — the alternative board, and why |
-| [`solar_node_xiao.drawio`](solar_node_xiao.drawio) | power chain for the XIAO variant: TL431 clamp, no external regulator |
+| [`solar_node_xiao.drawio`](solar_node_xiao.drawio) | power chain for the XIAO variant: TL431 clamp, HT7533 into `3V3` |
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |
 | [`proto_oled_d1_mini.md`](proto_oled_d1_mini.md) | earlier ESP8266 bench rig and its power analysis |

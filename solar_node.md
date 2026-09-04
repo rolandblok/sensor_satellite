@@ -7,7 +7,7 @@ low-Iq LDO → ESP32-C3 + BME280 + 2.9" e-paper.
 | ---- | ---- |
 | `solar_node.pdf` / `.svg` | rendered schematic, nothing needed to view it |
 | `solar_node.drawio` | block diagram and the bench-test wiring sheets |
-| `solar_node_xiao.drawio` | the XIAO variant: TL431 clamp, no external regulator |
+| `solar_node_xiao.drawio` | the XIAO variant: TL431 clamp, HT7533 into the `3V3` pin |
 | `tools/gen_schematic.py` | the circuit as code; regenerates the schematic |
 | `tools/scope_log.py` | logs DC measurements off the DS1054Z over LAN to CSV |
 | this file | design notes and measurements, renders on GitHub |
@@ -318,24 +318,32 @@ feeding `3V3` directly with the onboard regulator and power LED desoldered.
 Until those are removed, optimising the external part is pointless: the board's
 own 40–100 µA dwarfs the difference between a 1.6 µA and a 4 µA regulator.
 
-**8b. The XIAO variant deletes the external LDO instead.** On a Seeed XIAO
-ESP32-C3 there is no power LED and no RGB pixel to desolder, so note 8's reason
-for fitting an external regulator — the board's own always-on loads dwarfing the
-difference between a 1.6 µA and a 4 µA part — loses its force. VCAP feeds the
-`5V` pin and the onboard 700 mA regulator makes 3V3, permanently. See
-`solar_node_xiao.drawio` and [gpio_xiao.md](gpio_xiao.md).
+**8b. The XIAO needs the HT7533 too — measured 2026-09-04.** This note used to
+say the opposite: that with no power LED and no pixel to desolder, the XIAO could
+skip the external regulator and run off its onboard one. **Measurement says no.**
 
-Feeding `3V3` directly is not an alternative there: VCAP runs 4.6 V down to
-~3.0 V, and anything above 3.6 V would exceed the pin's rating. Skipping the
-external LDO therefore *means* using the onboard one.
+Fed at the `5V` pin, through the onboard regulator, the XIAO's consumption is
+high. Fed at `3V3` from an **HT7533**, with the onboard LED removed, it sleeps at
+**40–50 µA** — which is Seeed's published 43–44 µA, so essentially the whole
+excess was the onboard regulator and the LED, not the C3.
 
-Three unknowns come with that, and all three are measurements, not opinions: the
-onboard regulator's quiescent current, its dropout (which sets the brownout
-point the way 3.04 V does on the SuperMini), and **what the LiPo charge IC draws
-with nothing on B+/B−**, since it shares the `5V` pin. Seeed's published 43–44 µA
-deep sleep may well be a `3V3` or battery-pad figure that excludes both. Step 3
-of the plan — `5V` versus `3V3` injection — answers the first two on either
-board.
+That is the first hard evidence for design note 8's assumption, which said the
+onboard part is the wasteful one and admitted it was untested. It is now tested,
+on the XIAO. **So the external LDO stays in the design**, and the end
+configuration is VCAP → HT7533 → the XIAO's `3V3` pin, onboard regulator
+bypassed and LED off the board. See `solar_node_xiao.drawio` and
+[gpio_xiao.md](gpio_xiao.md).
+
+Note that feeding `3V3` is only possible *because* an external regulator is
+fitted: VCAP runs 4.6 V down to ~3.0 V and anything above 3.6 V would exceed the
+pin's rating, so the choice was never "3V3 direct or onboard LDO" — it was
+"external LDO or onboard LDO", and the external one wins by an order of
+magnitude.
+
+One unknown from the earlier version survives: **what the LiPo charge IC draws
+with nothing on B+/B−.** Feeding `3V3` bypasses the `5V` pin entirely, so the
+charger should now be out of the circuit — but that is an inference, not a
+measurement, and the 40–50 µA figure already bounds it at "small".
 
 **9. USB is a third source, not a special case.** The bench rule "never connect
 the panel and USB together" exists only because the bench rig ties VCAP straight
@@ -704,7 +712,7 @@ of the range and the whole region below dropout where the node is not running.
 
 ---
 
-## Where this left off — 2026-09-03
+## Where this left off — 2026-09-04
 
 Working and verified on hardware:
 
@@ -743,6 +751,23 @@ Working and verified on hardware:
   1.86 mA sleep floor it would explain came out of the discarded ground-loop
   session. Take it as a load to remove before the redo, not as the answer.
   Details in [gpio.md](gpio.md).
+* **A XIAO ESP32-C3 sleeps at 40–50 µA on an HT7533, measured 2026-09-04.** The
+  first trustworthy sleep figure this project has. Two changes got there, and the
+  order matters because they were measured separately: fed at the `5V` pin
+  through the **onboard** regulator, consumption was high; refitted with an
+  **HT7533 into the `3V3` pin**, and with the XIAO's onboard LED removed, it
+  drops to 40–50 µA. That lands on Seeed's published 43–44 µA, so essentially all
+  of the excess was the onboard regulator and the LED rather than the C3 itself.
+
+  This settles two open questions at once. Design note 8 assumed the onboard
+  regulator is the wasteful one and said so was untested — it is now tested.
+  And step 3's `5V` versus `3V3` comparison is answered on this board. **The end
+  configuration therefore keeps the external LDO**: VCAP → HT7533 → `3V3`. See
+  design note 8b.
+
+  Not yet measured on the XIAO: the exact `5V`-fed figure (recorded here only as
+  "high"), the HT7533's dropout and so the brownout point, and anything under
+  load rather than asleep.
 
 Bench gotchas worth remembering:
 
@@ -795,10 +820,12 @@ Next, in order:
    rather than straight to the desoldering iron is what turns a datasheet claim
    about the variant into a number for this board. Take the power LED off in the
    same pass, measuring between the two so each is attributed separately.
-3. **Then split what is left**: peripherals on versus off, and `5V` versus `3V3`
-   injection. The second difference is the onboard regulator's quiescent current and it
-   decides whether the external HT7333 is worth fitting. Design note 8 assumed
-   the onboard part is the wasteful one; that remains untested.
+3. **Then split what is left**: peripherals on versus off. The `5V` versus `3V3`
+   half of this is **done on the XIAO, 2026-09-04** — the onboard regulator is
+   indeed the wasteful one, and an HT7533 into `3V3` gets the board to 40–50 µA
+   asleep. Design note 8's assumption is confirmed and design note 8b records it.
+   Still open on the SuperMini, and still open is the *number* for the `5V` path
+   on the XIAO, recorded so far only as "high".
 4. **Effective capacitance at load.** Still open. It needs a trustworthy current
    to divide `dV/dt` into, so it waits on step 1. The 3.8–5.6 F measured while
    charging is rate- and voltage-dependent and two discharge runs at different

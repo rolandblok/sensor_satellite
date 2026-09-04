@@ -166,6 +166,16 @@ GPIO0 and GPIO1 are missing — so the I²C bus moves to `FORCE_SDA 20` /
 if the GPIO20 log mirror goes, which means logging to flash instead. Full pin
 map, strapping and boot reasoning in [gpio_xiao.md](gpio_xiao.md).
 
+The sketch builds for both — set `BOARD_XIAO 1` and use FQBN
+`esp32:esp32:XIAO_ESP32C3:`**`CDCOnBoot=default`**. That value is not a typo: the
+XIAO's board definition inverts the option against the SuperMini's, so carrying
+`CDCOnBoot=cdc` over disables CDC and, with the mirror also compiled out, leaves
+the firmware with no output path at all. See the gotchas in
+[gpio_xiao.md](gpio_xiao.md).
+
+Flashed to a XIAO on COM7, 2026-09-04. With the mirror gone it has no log on cap
+power, so it is bench-and-USB only until the flash logger is written.
+
 ---
 
 ## Firmware
@@ -175,13 +185,15 @@ Unified Sensor**.
 
 | Define | Default | Meaning |
 | ------ | ------- | ------- |
+| `BOARD_XIAO` | `0` | 0 = ESP32-C3 SuperMini. 1 = Seeed XIAO — moves the I²C bus and drops the log mirror |
 | `PANEL_V2` | `1` | 1 = V2 board (SSD1680). 0 = V1 (IL3820). |
 | `CYCLE_S` | `300` | seconds between refreshes — keep ≥ 180 |
 | `LOG_S` | `2` | serial log interval when not deep sleeping |
 | `ALTITUDE_M` | `17.0` | Eindhoven, ~17 m AMSL — for sea-level pressure |
 | `MIN_REFRESH_C` | `0.0` | below this the panel is skipped, image kept |
 | `USE_DEEP_SLEEP` | `1` | 1 = sleep between cycles; `0` while USB-tethered |
-| `FORCE_SDA` / `FORCE_SCL` | `0` / `1` | I²C pinned; set both to `-1` to auto-detect again |
+| `FORCE_SDA` / `FORCE_SCL` | `0` / `1` | I²C pinned; `20` / `2` when `BOARD_XIAO`. Set both to `-1` to auto-detect |
+| `USE_LOG_MIRROR` | `1` | set by `BOARD_XIAO`; 0 compiles `Serial0` out and leaves only USB-CDC |
 | `VSENSE_PIN` | `3` | supercapacitor divider tap |
 | `VDIV_NUM` | `2.0` | divider ratio, `(R3+R4)/R4` |
 | `VDIV_CAL` | `1.0149` | calibration, meter ÷ reported — fitted 2026-08-28 |

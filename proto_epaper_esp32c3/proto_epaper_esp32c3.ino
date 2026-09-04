@@ -1,5 +1,6 @@
 // sensor_satellite - prototype 2
 // ESP32-C3 SuperMini + BME280 (I2C) + Waveshare 2.9" b/w e-paper (SPI, SSD1680)
+// Also builds for a Seeed XIAO ESP32-C3 - set BOARD_XIAO below. See gpio_xiao.md.
 //
 // No <WiFi.h> on purpose. This node never uses WiFi or BLE, and the Arduino
 // core does not power the RF PHY until something calls WiFi.*/BLE*. Including
@@ -25,28 +26,57 @@
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
 #define MIN_REFRESH_C   0.0f   // below this the panel is skipped, image is kept
 
-// e-paper pins (SPI). DIN/CLK/CS are the C3's native FSPI pins.
+// ---------------- board / pin map ----------------
+// Both boards are the same silicon. The XIAO brings out 11 GPIO against the
+// SuperMini's 13 - GPIO0 and GPIO1 are not bonded out - so the I2C bus is the
+// only thing that moves. Everything else keeps its pin. See gpio_xiao.md.
+#define BOARD_XIAO      1      // 0 = ESP32-C3 SuperMini (what this build runs on)
+                               // 1 = Seeed XIAO ESP32-C3
+
+// e-paper (SPI) and VSENSE. Identical on both boards; the XIAO silk-screens the
+// same GPIO under D-numbers, which do not correspond in any regular way - D6 is
+// GPIO21 and D7 is GPIO20, adjacent on the chip and opposite sides of the board.
+// Wire from the GPIO number, not the silk.
+//
 // DC is on GPIO21, not GPIO3: GPIO3 is the only ADC1 channel left for VSENSE.
 // GPIO21 is UART0 TX, free here because Serial is USB-CDC on GPIO18/19.
-#define EPD_CS    7
-#define EPD_DC    21
-#define EPD_RST   5
-#define EPD_BUSY  10
-#define EPD_SCK   4
-#define EPD_MOSI  6
+#define EPD_CS    7            // XIAO D5
+#define EPD_DC    21           // XIAO D6
+#define EPD_RST   5            // XIAO D3
+#define EPD_BUSY  10           // XIAO D10
+#define EPD_SCK   4            // XIAO D2
+#define EPD_MOSI  6            // XIAO D4
 #define EPD_MISO  -1           // MUST be -1: the default MISO is GPIO5, used by RST
 
+// I2C bus, pinned rather than auto-detected - the sweep would otherwise drive
+// the VSENSE tap as a bus line. Set both to -1 to sweep again; the candidate
+// list is board-specific, see "bus discovery" below.
+//
 // UART mirror of the log. Serial is native USB-CDC and disappears the moment
-// USB is unplugged - which is exactly when the node runs from the cap. GPIO20 is
-// U0RXD, free because Serial is USB-CDC, and is used here as UART0 TX. A
+// USB is unplugged - which is exactly when the node runs from the cap. A
 // listener board on the other end keeps the log alive - see logger_d1_mini/.
-#define LOG_TX_PIN 20
+#if BOARD_XIAO
+  // SCL takes the strapping pin, not SDA. SCL is master-driven and nothing but
+  // a short can hold it low; SDA can be held low by a slave hung mid-transaction
+  // through a reset, and a strapping pin low at reset is a board that will not
+  // boot. The breakout's bus pull-up is what satisfies the strapping - internal
+  // pulls are not dependable in the sampling window before software runs.
+  #define FORCE_SDA      20    // D7, U0RXD - an input, silent through reset
+  #define FORCE_SCL      2     // D0 - strapping, held high by the bus pull-up
+  // GPIO20 is SDA here, so it cannot also be the mirror TX. Dropping the mirror
+  // is what frees the pin: without it this build does not fit. The replacement
+  // is logging to the C3's own flash, which is NOT WRITTEN YET - until it is,
+  // the XIAO build has no log once USB is unplugged, so no cap-power runs.
+  #define USE_LOG_MIRROR 0
+  #define LOG_TX_PIN     -1
+#else
+  #define FORCE_SDA      0
+  #define FORCE_SCL      1
+  // GPIO20 is U0RXD, free because Serial is USB-CDC, used here as UART0 TX.
+  #define USE_LOG_MIRROR 1
+  #define LOG_TX_PIN     20
+#endif
 #define LOG_BAUD   115200
-
-// I2C bus. Pinned, not auto-detected: the sweep probes GPIO0..10 and would
-// otherwise drive the VSENSE pin as a bus line. Set both to -1 to sweep again.
-#define FORCE_SDA 0
-#define FORCE_SCL 1
 
 // Supercapacitor sense. 1 Mohm / 1 Mohm divider with 100 nF at the tap, on the
 // one ADC1 channel this build has spare. GPIO2 would have been the obvious pin
@@ -61,7 +91,7 @@
 // left alone here - see parkPins() below.
 #define PARK_PINS       1
 
-#define VSENSE_PIN 3
+#define VSENSE_PIN 3       // XIAO D1 - ADC1_3 on both boards
 #define VDIV_NUM   2.0f    // (R3+R4)/R4
 #define VDIV_CAL   1.0149f // 2026-08-28: DMM 4.81 V vs 4.7962 V, mean of 5 boots
                            // (spread 4.782-4.811, so this is good to ~0.3%)
@@ -108,14 +138,18 @@ static void logBoth(const char *fmt, ...) {
   // and printing to both duplicates every line on GPIO20.
   Serial.print(buf);
 #endif
+#if USE_LOG_MIRROR
   Serial0.print(buf);
+#endif
 }
 
 // Progress marker. Flushes, because the point is to survive a hang in the
 // very next call - anything left in the TX FIFO would be lost.
 static void mark(const char *what) {
   logBoth("# mark: %s\n", what);
+#if USE_LOG_MIRROR
   Serial0.flush();
+#endif
 #if ARDUINO_USB_CDC_ON_BOOT
   Serial.flush();
 #endif
@@ -123,9 +157,17 @@ static void mark(const char *what) {
 }
 
 // ---------------- bus discovery ----------------
-// GPIO18/19 are USB, GPIO20 is the log mirror, GPIO21 is e-paper DC.
-// GPIO3 is excluded too: driving the VSENSE tap as a bus line fights the divider.
+// Only used when FORCE_SDA/FORCE_SCL are -1; forced pins skip the sweep entirely.
+// GPIO18/19 are USB and GPIO21 is e-paper DC on both boards. GPIO3 is excluded
+// too: driving the VSENSE tap as a bus line fights the divider.
+#if BOARD_XIAO
+// GPIO0/GPIO1 do not exist on this board, and GPIO20 is free to sweep because
+// there is no log mirror on it - it is where SDA actually lives.
+static const uint8_t PINS[] = {2, 4, 5, 6, 7, 8, 9, 10, 20};
+#else
+// GPIO20 is the log mirror here, so it is not a candidate.
 static const uint8_t PINS[] = {0, 1, 2, 4, 5, 6, 7, 8, 9, 10};
+#endif
 static const uint8_t NPINS  = sizeof(PINS) / sizeof(PINS[0]);
 
 static bool probe(uint8_t addr) {
@@ -334,8 +376,10 @@ static void runCycle() {
 // pad can be driven again, or writes to it are silently ignored.
 static void unparkPins() {
 #if PARK_PINS
-  // GPIO8 is included defensively: an earlier build latched it high, and that
-  // hold lives in the RTC domain and survives a reflash until cleared.
+  // GPIO8 and GPIO2 are included unconditionally and defensively: an earlier
+  // build latched GPIO8 high, and a hold lives in the RTC domain and survives a
+  // reflash until cleared. On the XIAO GPIO2 is also FORCE_SCL, so it is
+  // released twice - gpio_hold_dis() is idempotent, so that is harmless.
   const gpio_num_t held[] = {(gpio_num_t)8, (gpio_num_t)2,
                              (gpio_num_t)FORCE_SDA, (gpio_num_t)FORCE_SCL,
                              (gpio_num_t)EPD_BUSY};
@@ -350,24 +394,29 @@ static void unparkPins() {
 // must never be pulled low.
 static void parkPins() {
 #if PARK_PINS
-  // GPIO8 is deliberately NOT touched. This is a SuperMini Plus V2: GPIO8 is
-  // the data line of a WS2812B RGB pixel, not an LED anode. The pixel's
+  // GPIO8 is deliberately NOT touched on either board. On the SuperMini Plus V2
+  // it is the data line of a WS2812B RGB pixel, not an LED anode: the pixel's
   // controller runs off 3V3 whatever the pin does and costs ~1 mA even showing
   // black, so no pin state here saves anything - only desoldering it does. A
   // pull-up would just source into its input, and holding it LOW is worse: the
-  // hold survives the wake reset and GPIO8 must be high at boot.
+  // hold survives the wake reset and GPIO8 must be high at boot. On the XIAO the
+  // pin carries nothing at all, and the same "leave it alone" applies.
   //
   // An earlier comment here called it a blue LED with 206 uA of drive current,
   // from the 2026-09-03 shunt session that was later thrown out for a ground
   // loop. That 206 uA is unexplained, not an LED. See gpio.md.
+#if !BOARD_XIAO
   pinMode(2,  INPUT_PULLUP);                   // strapping, unconnected by design
+#endif                                         // on the XIAO GPIO2 *is* FORCE_SCL
   pinMode(FORCE_SDA, INPUT_PULLUP);            // I2C idles high
-  pinMode(FORCE_SCL, INPUT_PULLUP);
+  pinMode(FORCE_SCL, INPUT_PULLUP);            // XIAO: this is GPIO2, strapping
   pinMode(EPD_BUSY,  INPUT_PULLDOWN);          // BUSY idles low
 
   // A pull set by pinMode alone does not survive deep sleep - the digital
   // domain powers down. Latching is what makes the pull mean anything here.
+#if !BOARD_XIAO
   gpio_hold_en((gpio_num_t)2);
+#endif
   gpio_hold_en((gpio_num_t)FORCE_SDA);
   gpio_hold_en((gpio_num_t)FORCE_SCL);
   gpio_hold_en((gpio_num_t)EPD_BUSY);
@@ -378,10 +427,12 @@ static void parkPins() {
 void setup() {
   unparkPins();
   Serial.begin(115200);
+#if USE_LOG_MIRROR
   // UART0 TX remapped to GPIO20. Must come before display.init(): UART0's
   // default TX is GPIO21, and init()'s pinMode() on DC is what takes GPIO21
   // back off the UART matrix afterwards.
   Serial0.begin(LOG_BAUD, SERIAL_8N1, -1, LOG_TX_PIN);
+#endif
   delay(300);                  // let USB-CDC enumerate before the first print
   bootCount++;
   logBoth("\n# proto_epaper_esp32c3  boot #%lu\n", (unsigned long)bootCount);
@@ -422,7 +473,9 @@ void setup() {
   runCycle();
   logBoth("# sleeping %d s\n", CYCLE_S);
   Serial.flush();
+#if USE_LOG_MIRROR
   Serial0.flush();
+#endif
   mark("parkPins enter");
   parkPins();
   mark("parkPins returned - sleeping now");
