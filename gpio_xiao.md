@@ -91,17 +91,17 @@ VCAP feeds the **HT7533**, whose output feeds `3V3`. The `5V` pin is unused and
 the onboard regulator is bypassed.
 
 ```
-                                 /--USB-C--\
-  BME280 SCL ------- GPIO2   ----|         |---- 5V     ---- unused
-  VSENSE, Vcap tap - GPIO3   ----|         |---- GND    ---- common ground
-  e-paper CLK ------ GPIO4   ----|         |---- 3V3    <--- HT7533 out, and
-                                 |         |                 BME280 + e-paper VCC
-  e-paper RST ------ GPIO5   ----|         |---- GPIO10 ---- e-paper BUSY
-  e-paper DIN ------ GPIO6   ----|         |---- GPIO9  ---- free (BOOT button)
-  e-paper CS  ------ GPIO7   ----|         |---- GPIO8  ---- free
-  e-paper DC  ------ GPIO21  ----|         |---- GPIO20 ---- BME280 SDA
-                                 | [u.FL]  |
-                                 \---------/
+                                    /--USB-C--\
+  BME280 SCL ------ D0  GPIO2   ----|         |---- 5V                 unused
+  VSENSE tap ------ D1  GPIO3   ----|         |---- GND          ----  common ground
+  e-paper CLK ----- D2  GPIO4   ----|         |---- 3V3          <---  HT7533 out, and
+                                    |         |                        BME280 + e-paper VCC
+  e-paper RST ----- D3  GPIO5   ----|         |---- GPIO10  D10  ----  e-paper BUSY
+  e-paper DIN ----- D4  GPIO6   ----|         |---- GPIO9   D9   ----  free (BOOT button)
+  e-paper CS ------ D5  GPIO7   ----|         |---- GPIO8   D8   ----  free
+  e-paper DC ------ D6  GPIO21  ----|         |---- GPIO20  D7   ----  BME280 SDA
+                                    | [u.FL]  |
+                                    \---------/
 ```
 
 | Device | Signal | C3 pin | Silk | Moved? |
