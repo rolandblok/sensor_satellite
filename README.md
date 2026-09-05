@@ -1,12 +1,37 @@
 # sensor satellite
 
-A low-power outdoor environmental sensor node: an ESP32-C3 reads temperature,
+A small **tabletop electronic sculpture**: an ESP32-C3 reads temperature,
 humidity and pressure, and renders them to a 2.9" e-paper panel that holds its
-image without power. Intended to run eventually from a solar panel and a
-supercapacitor, with no battery and no maintenance.
+image without power. It runs from a solar panel and a supercapacitor, with no
+battery and no maintenance.
+
+**It lives indoors.** That is the design case, not a bench convenience — see
+[solar_node.md](solar_node.md), where it is the single biggest constraint on the
+energy budget.
 
 The e-paper is the reason the energy budget works — it draws power only during
 a refresh, and nothing at all while displaying.
+
+## There is no PCB
+
+**The wiring is the object.** This is a tabletop sculpture of a satellite, and
+the connections are made as **3D wire bends** — shaped, free-standing runs that
+hold the modules in place and form the structure. There is no circuit board, and
+there is not going to be one.
+
+[`seed_mini_drawing.svg`](seed_mini_drawing.svg) is the drawing of those wire
+traces: an A4 Inkscape sheet, not a schematic and not a layout. It is the
+template for what gets bent.
+
+Two consequences worth carrying into the rest of these notes:
+
+* **A schematic is not the deliverable.** The KiCad project was removed on
+  2026-08-21 for this reason — see [solar_node.md](solar_node.md). The design
+  notes, the drawio sheets and the pinout files are the current intent.
+* **Pin assignment has a physical dimension.** Which pin a signal lands on
+  decides where its wire physically runs, so electrical freedom and the shape of
+  the sculpture are the same decision. [gpio_xiao.md](gpio_xiao.md) records what
+  is electrically fixed and what is not.
 
 ```
          Sun                    ESP32-C3
@@ -158,6 +183,7 @@ partway through one.
 | [`gpio.md`](gpio.md) | ESP32-C3 SuperMini pinout and this build's pin map |
 | [`gpio_xiao.md`](gpio_xiao.md) | Seeed XIAO ESP32-C3 pinout — the alternative board, and why |
 | [`solar_node_xiao.drawio`](solar_node_xiao.drawio) | power chain for the XIAO variant: TL431 clamp, HT7533 into `3V3` |
+| [`seed_mini_drawing.svg`](seed_mini_drawing.svg) | the wire traces to bend — A4 Inkscape sheet, the build template |
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |
 | [`proto_oled_d1_mini.md`](proto_oled_d1_mini.md) | earlier ESP8266 bench rig and its power analysis |

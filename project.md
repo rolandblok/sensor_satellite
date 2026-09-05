@@ -1,6 +1,8 @@
 ## Solar-powered e-paper environmental sensor node
 
-A small autonomous outdoor sensor/display built around an **ESP32-C3**, powered by a **solar panel + supercapacitor**, with an **e-paper display** that keeps showing information without consuming power.
+A small autonomous **indoor tabletop sculpture** built around an **ESP32-C3**, powered by a **solar panel + supercapacitor**, with an **e-paper display** that keeps showing information without consuming power.
+
+> **This document is the original concept and predates the build.** It was written for an outdoor node; the object is a tabletop sculpture that lives indoors, wired as 3D wire bends with no PCB. Where this file assumes outdoor light or weather, see the correction at the top of the design notes in [solar_node.md](solar_node.md).
 
 ### Goal
 
@@ -241,6 +243,23 @@ This makes solar operation realistic.
 | Light sensor | BH1750                             |
 | Protection   | 1N5819 Schottky diode              |
 | Wiring       | 20 AWG power, thinner signal wires |
+
+---
+
+## Construction: wire bends, not a board
+
+**There is no PCB.** The finished thing is a tabletop sculpture of a satellite,
+and the wiring is its structure: connections are made as 3D wire bends that
+stand on their own and hold the modules in position. The wire is doing two jobs
+at once, carrying signal and being the frame.
+
+That is why the BOM line above says wire gauges rather than a board, and why
+`seed_mini_drawing.svg` — an A4 Inkscape drawing of the wire traces — is the
+build template. Bend from that, not from a schematic.
+
+It also means pin assignment is partly a mechanical decision. Moving a signal to
+a different GPIO moves where its wire physically runs, so the electrical freedom
+described in `gpio_xiao.md` is also freedom over the shape.
 
 ---
 

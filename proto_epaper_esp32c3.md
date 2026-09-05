@@ -355,8 +355,9 @@ Hardware limits, not preferences. They shape the sleep strategy.
 * **Full refresh avoids ghosting.** The firmware does a full-window update each
   cycle. If partial updates are added later, force a full refresh every 10–20
   partials to clear accumulated artefacts.
-* **Refresh is unreliable below 0 °C.** Relevant outdoors in Eindhoven every
-  winter. Below `MIN_REFRESH_C` the firmware skips the update and keeps the
+* **Refresh is unreliable below 0 °C.** Not reachable for this build — it is an
+  indoor tabletop sculpture — so `MIN_REFRESH_C` is now insurance rather than a
+  working limit. Below `MIN_REFRESH_C` the firmware skips the update and keeps the
   previous image — the panel is bistable, so this costs nothing but staleness.
 
 ---

@@ -294,5 +294,11 @@ do not correspond in any regular way — D6 is GPIO21 and D7 is GPIO20, which ar
 adjacent on the chip and on opposite sides of the board. Wire from the GPIO
 column of the table above, not the silk.
 
+**Pin choice is also a mechanical decision.** There is no PCB — the connections
+are 3D wire bends that form the structure of the sculpture — so moving a signal
+to a different GPIO moves where its wire physically runs. Anything electrically
+free above is free to be routed for the shape as well; `seed_mini_drawing.svg`
+is the drawing of the traces as they are actually bent.
+
 Power chain, the TL431 clamp and the skipped regulator are in
 [solar_node.md](solar_node.md) and `solar_node_xiao.drawio`.

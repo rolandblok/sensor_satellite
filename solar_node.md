@@ -12,11 +12,16 @@ low-Iq LDO → ESP32-C3 + BME280 + 2.9" e-paper.
 | `tools/scope_log.py` | logs DC measurements off the DS1054Z over LAN to CSV |
 | this file | design notes and measurements, renders on GitHub |
 
-**There is no KiCad project in this repo.** It was removed on 2026-08-21, and
-the exported netlist `solar_node.net` was dropped on 2026-08-28 once it had
-fallen far enough behind the design to mislead. What survives is the generator
-and the rendered output — `gen_schematic.py` is the definition, the PDF/SVG are
-what it last looked like.
+**There is no KiCad project in this repo, and there will not be one.** It was
+removed on 2026-08-21, and the exported netlist `solar_node.net` was dropped on
+2026-08-28 once it had fallen far enough behind the design to mislead. What
+survives is the generator and the rendered output — `gen_schematic.py` is the
+definition, the PDF/SVG are what it last looked like.
+
+The reason is not neglect: **this build has no PCB.** It is a tabletop sculpture
+of a satellite, wired with 3D wire bends that form its structure, so a board
+layout was never the deliverable. `seed_mini_drawing.svg` is the drawing that
+matters — the wire traces to bend. See the [README](README.md).
 
 The Mermaid diagram below is a **block diagram**, not a schematic: connectivity
 and values, no component symbols. For the circuit itself use `gen_schematic.py`
@@ -145,6 +150,37 @@ flowchart LR
     class DIV store
 ```
 
+## Indoors is the deployment case — 2026-09-05
+
+**This is a tabletop sculpture that lives indoors.** Several notes below were
+written assuming an outdoor node and are wrong in ways worth naming, because the
+indoor case is harder, not easier:
+
+* **Light is the binding constraint now.** The 2026-08-21 measurements put indoor
+  window light at roughly 7 h/day of usable charge current, and this file called
+  that "marginal indoors, but indoor light is not the deployment case". It is the
+  deployment case. Still-unmeasured item 5 — Isc on an overcast day — should be
+  read as *Isc at the spot on the table where this will actually stand*, and it
+  remains the number the whole design rests on.
+* **The clamp is much less urgent.** Design note 3 sizes it against ~6.5 V Voc in
+  bright sun. `Voc ∝ log(light)`, so indoors it sags perhaps 20% — call it 5.2 V,
+  4.9 V after a diode, under the cap's 5.5 V rating. Direct sun through a window
+  is the case that could still reach it, so this is an argument for measuring Voc
+  at the real location rather than for deleting the clamp.
+* **Commercial-grade parts are fine.** Design note 3a argues for the `TL431AIZ`
+  industrial grade because "cold and bright is a real combination here". Indoors
+  it is not. `TL431ACZ` (0…+70 °C) is enough, and the same goes for every other
+  temperature-range decision in this file.
+* **Winter, shading, fences and gutters do not apply.** Design note 1's shading
+  argument for parallel panels still holds — a hand, a mug or the sculpture's own
+  structure shades a panel indoors just as well — but the seasonal reasoning does
+  not.
+* **The e-paper's sub-zero refresh limit is moot.** `MIN_REFRESH_C` guards
+  against refreshing below 0 °C, which cannot happen on a table.
+
+Nothing below has been rewritten; this note is the correction. Where a design
+note reasons from sun, weather or season, read it as history.
+
 ## Design notes
 
 **1. Panels in parallel, not series.** Two 5 V panels in series give ~13 V open
@@ -203,13 +239,14 @@ Three details decide the circuit:
   panel and the circuit is self-defeating: shorting the panel removes the
   voltage holding the gate on, and it oscillates through its linear region.
 
-**Part choice.** `TL431AIZ` — TO-92, A grade, and `I` for −40…+85 °C. The grade
-barely matters (±1% of 5.1 V is 51 mV against 500 mV of headroom, and the trip
-point is trimmed on the bench anyway); the **temperature range does**, because
-cold and bright is a real combination here. A clear February day is exactly when
-the panels are at full output and a commercial-grade part is outside its rated
-range, and a reference that drifts low starts stealing charge on the sunniest
-winter day of the year.
+**Part choice.** `TL431ACZ` — TO-92, A grade, commercial 0…+70 °C. **This
+build lives indoors**, so the temperature range is not a constraint and the
+cheaper grade is right. The tolerance grade barely matters either: ±1% of 5.1 V
+is 51 mV against 500 mV of headroom, and the trip point is trimmed on the bench.
+
+*(Written earlier as `TL431AIZ`, arguing for the −40…+85 °C industrial grade
+because "cold and bright is a real combination here". That was for an outdoor
+node. On a table it is not.)*
 
 **Divider — and the target is 5.2 V, not 5.1 V.** Design note 9 sets the
 threshold: USB at 5.25 V less a 0.2 V Schottky drop puts VCAP at ~5.05 V, so a
@@ -925,7 +962,7 @@ Next, in order:
    less than the 620 kΩ witness branch.
 6. **Re-check `VDIV_CAL`** once both instruments tap the same point — see the
    3.6 Ω tap-point problem above.
-7. Then the open items below — ESR, and Isc outdoors on an overcast day.
+7. Then the open items below — ESR, and Isc at the sculpture's actual location.
 
 **The clamp is still not fitted.** Do not leave this rig charging in a window
 unattended.
@@ -954,7 +991,10 @@ Still open, roughly in order of what would change the design:
 4. **Active, sleep and refresh current** for the node itself, and the **quiescent
    current of the HT7333 and HT7533**. Unchanged from before — still the numbers
    that decide whether two panels are needed and whether 4 F is enough.
-5. **Isc outdoors on an overcast day.** Everything measured so far is indoor
-   light. This is the number the whole design actually rests on.
+5. **Isc at the spot on the table where this will actually stand**, across a
+   normal day. Everything measured so far is indoor light, which is now the
+   deployment case rather than a stand-in for it — so this is no longer a
+   pessimistic bound, it is the number the whole design rests on. Measure Voc
+   there too: it decides whether the clamp is needed at all.
 
 **Do not order parts from this diagram yet.**
