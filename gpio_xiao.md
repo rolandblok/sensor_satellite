@@ -94,32 +94,68 @@ the onboard regulator is bypassed.
                                     /--USB-C--\
   BME280 SCL ------ D0  GPIO2   ----|         |---- 5V                 unused
   VSENSE tap ------ D1  GPIO3   ----|         |---- GND          ----  common ground
-  e-paper CLK ----- D2  GPIO4   ----|         |---- 3V3          <---  HT7533 out, and
+  e-paper DIN ----- D2  GPIO4   ----|         |---- 3V3          <---  HT7533 out, and
                                     |         |                        BME280 + e-paper VCC
-  e-paper RST ----- D3  GPIO5   ----|         |---- GPIO10  D10  ----  e-paper BUSY
-  e-paper DIN ----- D4  GPIO6   ----|         |---- GPIO9   D9   ----  free (BOOT button)
-  e-paper CS ------ D5  GPIO7   ----|         |---- GPIO8   D8   ----  free
+  e-paper CLK ----- D3  GPIO5   ----|         |---- GPIO10  D10  ----  e-paper BUSY
+  e-paper CS ------ D4  GPIO6   ----|         |---- GPIO9   D9   ----  free (BOOT button)
+  e-paper RST ----- D5  GPIO7   ----|         |---- GPIO8   D8   ----  free
   e-paper DC ------ D6  GPIO21  ----|         |---- GPIO20  D7   ----  BME280 SDA
                                     | [u.FL]  |
                                     \---------/
 ```
 
-| Device | Signal | C3 pin | Silk | Moved? |
-| ------ | ------ | ------ | ---- | ------ |
-| BME280 | SCL | GPIO2 | D0 | **yes**, from GPIO1 |
-| Vcap divider | VSENSE tap | GPIO3 | D1 | no |
-| e-paper | CLK | GPIO4 | D2 | no |
-| e-paper | RST | GPIO5 | D3 | no |
-| e-paper | DIN | GPIO6 | D4 | no |
-| e-paper | CS | GPIO7 | D5 | no |
-| e-paper | BUSY | GPIO10 | D10 | no |
-| e-paper | DC | GPIO21 | D6 | no |
-| BME280 | SDA | GPIO20 | D7 | **yes**, from GPIO0 |
+| Device | Signal | C3 pin | Silk | vs. the SuperMini |
+| ------ | ------ | ------ | ---- | ----------------- |
+| BME280 | SCL | GPIO2 | D0 | **moved**, from GPIO1 |
+| Vcap divider | VSENSE tap | GPIO3 | D1 | same |
+| e-paper | DIN | GPIO4 | D2 | **moved**, from GPIO6 |
+| e-paper | CLK | GPIO5 | D3 | **moved**, from GPIO4 |
+| e-paper | CS | GPIO6 | D4 | **moved**, from GPIO7 |
+| e-paper | RST | GPIO7 | D5 | **moved**, from GPIO5 |
+| e-paper | DC | GPIO21 | D6 | same |
+| e-paper | BUSY | GPIO10 | D10 | same |
+| BME280 | SDA | GPIO20 | D7 | **moved**, from GPIO0 |
 | — | free | GPIO8, GPIO9 | D8, D9 | — |
 
-Nine signals into eleven pins, two spare. **Only the I²C bus moves.** In
-firmware that is `FORCE_SDA 20` and `FORCE_SCL 2`; on the bench it is two
-jumpers. Everything else keeps the pin it has today.
+Nine signals into eleven pins, two spare.
+
+### The e-paper order is chosen for the wire bends
+
+Read the left-hand column downward and it is the panel's own header order —
+**DIN, CLK, CS, DC, RST** — laid straight down D2 to D6. There is no PCB here;
+the connections are shaped wire that forms the sculpture's structure, so five
+wires running parallel instead of crossing is worth more than any electrical
+tidiness. The C3's GPIO matrix makes SPI pins free to place, and routing through
+the matrix rather than the IO-MUX caps the clock near 40 MHz against the panel's
+~4 MHz, so it costs nothing.
+
+**DC and RST are the one deliberate swap**, and the reason is the next section.
+
+### Why RST cannot take GPIO21, and DC can
+
+GPIO21 is UART0 TX, and **the ROM bootloader prints its boot log there at every
+reset — including every deep-sleep wake.** A few milliseconds of 115200 baud, so
+a burst of ~8.7 µs low periods on the pin before the sketch starts.
+
+RST on the SSD1680 is active LOW. Put it there and the panel takes dozens of
+short reset pulses every wake, *while it is hibernating*. It would still draw
+correctly — `GxEPD2::init()` does a proper hardware reset well afterwards — so
+this is not a functional fault. It is a power fault: the pulses drag the panel
+out of deep sleep into an undefined state for the ~300 ms until `init()` runs,
+every single cycle, and it would surface later as a sleep-current figure nobody
+could explain. In a project whose headline number is tens of microamps, that is
+the expensive kind of harmless.
+
+DC is the signal that belongs there. The C3 drives it, the panel never does, and
+nothing latches it — the boot-log wiggle is over long before `init()` touches the
+panel. **BUSY is the other pin that must never go there**, and for a different
+reason: the panel drives BUSY, so the ROM would be driving the pad against it.
+
+For completeness, **DIN would also be safe on GPIO21**. The panel only latches
+data on CLK edges with CS low, and CLK is idle through the boot log, so garbage
+on DIN is ignored. That would allow the reversed run RST, DC, CS, CLK, DIN down
+D2 to D6 — useful only if the panel ends up physically flipped, which is a choice
+the sculpture makes, not the electronics.
 
 ### This assumes the GPIO20 log mirror is gone
 
@@ -216,11 +252,33 @@ board switch at the top of the pin map:
                                // 1 = Seeed XIAO ESP32-C3
 ```
 
-Setting it to `1` moves the bus to `FORCE_SDA 20` / `FORCE_SCL 2`, compiles the
-`Serial0` mirror out via `USE_LOG_MIRROR`, drops GPIO2 from the `parkPins()`
-list (it is `FORCE_SCL` there, so it would otherwise be parked twice), and swaps
-the bus-discovery candidate list for one without GPIO0/GPIO1. The e-paper and
-VSENSE constants are shared and do not change.
+Setting it to `1` moves the bus to `FORCE_SDA 20` / `FORCE_SCL 2`, selects the
+wire-bend e-paper order below, compiles the `Serial0` mirror out via
+`USE_LOG_MIRROR`, drops GPIO2 from the `parkPins()` list (it is `FORCE_SCL`
+there, so it would otherwise be parked twice), and swaps the bus-discovery
+candidate list for one without GPIO0/GPIO1.
+
+```c
+#if BOARD_XIAO
+  #define EPD_MOSI  4          // D2  DIN
+  #define EPD_SCK   5          // D3  CLK
+  #define EPD_CS    6          // D4
+  #define EPD_RST   7          // D5   <- swapped with DC
+  #define EPD_DC    21         // D6   <- swapped with RST
+#else
+  #define EPD_SCK   4
+  #define EPD_RST   5
+  #define EPD_MOSI  6
+  #define EPD_CS    7
+  #define EPD_DC    21
+#endif
+#define EPD_BUSY  10
+#define EPD_MISO  -1
+```
+
+`EPD_BUSY`, `EPD_MISO` and `VSENSE_PIN` are shared and do not change. **The
+SuperMini branch is byte-for-byte the build it always was** — that board is
+physically wired the old way and nothing here disturbs it.
 
 Both configurations compile clean, and **note the different `CDCOnBoot` value** —
 see the gotchas, this is not a typo:
@@ -297,8 +355,12 @@ column of the table above, not the silk.
 **Pin choice is also a mechanical decision.** There is no PCB — the connections
 are 3D wire bends that form the structure of the sculpture — so moving a signal
 to a different GPIO moves where its wire physically runs. Anything electrically
-free above is free to be routed for the shape as well; `seed_mini_drawing.svg`
-is the drawing of the traces as they are actually bent.
+free above is free to be routed for the shape as well, which is exactly what the
+e-paper ordering does.
+
+**`seed_mini_drawing.svg` has not caught up.** It still shows DIN→D4, CLK→D2,
+CS→D5, RST→D3 from before the 2026-09-11 reorder. Only DC→D6 and BUSY→D10
+survive. This file is the authority until that drawing is redrawn.
 
 Power chain, the TL431 clamp and the skipped regulator are in
 [solar_node.md](solar_node.md) and `solar_node_xiao.drawio`.

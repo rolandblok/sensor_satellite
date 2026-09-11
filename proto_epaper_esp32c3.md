@@ -162,9 +162,11 @@ off. Same remedy, same pass — see [gpio.md](gpio.md).
 **Or change board.** A Seeed XIAO ESP32-C3 is the same silicon with no user LED
 and no pixel, at a published 43–44 µA. It brings out 11 GPIO instead of 13 —
 GPIO0 and GPIO1 are missing — so the I²C bus moves to `FORCE_SDA 20` /
-`FORCE_SCL 2` and every other pin in this file stays where it is. That only fits
-if the GPIO20 log mirror goes, which means logging to flash instead. Full pin
-map, strapping and boot reasoning in [gpio_xiao.md](gpio_xiao.md).
+`FORCE_SCL 2`. That only fits if the GPIO20 log mirror goes, which means logging
+to flash instead. The e-paper pins differ there as well, ordered to suit the
+wire bends rather than the silicon. **None of that touches the pin map in this
+file**, which is the SuperMini's and is unchanged. Full reasoning in
+[gpio_xiao.md](gpio_xiao.md).
 
 The sketch builds for both — set `BOARD_XIAO 1` and use FQBN
 `esp32:esp32:XIAO_ESP32C3:`**`CDCOnBoot=default`**. That value is not a typo: the

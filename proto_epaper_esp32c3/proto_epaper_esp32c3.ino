@@ -28,25 +28,45 @@
 
 // ---------------- board / pin map ----------------
 // Both boards are the same silicon. The XIAO brings out 11 GPIO against the
-// SuperMini's 13 - GPIO0 and GPIO1 are not bonded out - so the I2C bus is the
-// only thing that moves. Everything else keeps its pin. See gpio_xiao.md.
+// SuperMini's 13 - GPIO0 and GPIO1 are not bonded out - so the I2C bus has to
+// move. The e-paper pins differ too, but for a mechanical reason, below.
+// See gpio_xiao.md.
 #define BOARD_XIAO      1      // 0 = ESP32-C3 SuperMini (what this build runs on)
                                // 1 = Seeed XIAO ESP32-C3
 
-// e-paper (SPI) and VSENSE. Identical on both boards; the XIAO silk-screens the
-// same GPIO under D-numbers, which do not correspond in any regular way - D6 is
-// GPIO21 and D7 is GPIO20, adjacent on the chip and opposite sides of the board.
-// Wire from the GPIO number, not the silk.
-//
-// DC is on GPIO21, not GPIO3: GPIO3 is the only ADC1 channel left for VSENSE.
-// GPIO21 is UART0 TX, free here because Serial is USB-CDC on GPIO18/19.
-#define EPD_CS    7            // XIAO D5
-#define EPD_DC    21           // XIAO D6
-#define EPD_RST   5            // XIAO D3
-#define EPD_BUSY  10           // XIAO D10
-#define EPD_SCK   4            // XIAO D2
-#define EPD_MOSI  6            // XIAO D4
-#define EPD_MISO  -1           // MUST be -1: the default MISO is GPIO5, used by RST
+// D-numbers are the XIAO's silk. They do not correspond to the GPIO numbers in
+// any regular way - D6 is GPIO21 and D7 is GPIO20, adjacent on the chip and on
+// opposite sides of the board. Wire from the GPIO number, not the silk.
+#if BOARD_XIAO
+  // Ordered for the wire bends, not for the silicon. There is no PCB: the
+  // connections are shaped wire that forms the sculpture's structure, so the
+  // panel's header order (DIN CLK CS DC RST) is laid straight down D2..D6 and
+  // the wires run parallel instead of crossing.
+  //
+  // DC and RST are the one deliberate swap. RST cannot take GPIO21: the ROM
+  // bootloader prints its boot log there at every reset and every deep-sleep
+  // wake, and RST is active LOW, so the panel would be hammered with ~8.7 us
+  // reset pulses while hibernating - dragging the SSD1680 out of deep sleep for
+  // ~300 ms of every cycle until display.init() resets it properly. It would
+  // still draw correctly and quietly cost power, which is the one number this
+  // project is chasing. DC is safe there: the C3 drives it, the panel never
+  // does, and nothing latches it.
+  #define EPD_MOSI  4          // D2  DIN
+  #define EPD_SCK   5          // D3  CLK
+  #define EPD_CS    6          // D4
+  #define EPD_RST   7          // D5   <- swapped with DC
+  #define EPD_DC    21         // D6   <- swapped with RST
+#else
+  // DC is on GPIO21, not GPIO3: GPIO3 is the only ADC1 channel left for VSENSE.
+  // GPIO21 is UART0 TX, free here because Serial is USB-CDC on GPIO18/19.
+  #define EPD_SCK   4
+  #define EPD_RST   5
+  #define EPD_MOSI  6
+  #define EPD_CS    7
+  #define EPD_DC    21
+#endif
+#define EPD_BUSY  10           // XIAO D10 - panel-driven, so never GPIO21
+#define EPD_MISO  -1           // MUST be -1, or SPI claims a pin already in use
 
 // I2C bus, pinned rather than auto-detected - the sweep would otherwise drive
 // the VSENSE tap as a bus line. Set both to -1 to sweep again; the candidate

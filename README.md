@@ -23,6 +23,12 @@ there is not going to be one.
 traces: an A4 Inkscape sheet, not a schematic and not a layout. It is the
 template for what gets bent.
 
+**It is out of date.** It shows DIN→D4, CLK→D2, CS→D5, RST→D3 — the order from
+before the 2026-09-11 reorder. Four of its six e-paper wires have moved; only
+DC→D6 and BUSY→D10 still hold. [gpio_xiao.md](gpio_xiao.md) is correct, the
+drawing is not, and **the drawing is what gets built from** — so redraw it before
+bending anything.
+
 Two consequences worth carrying into the rest of these notes:
 
 * **A schematic is not the deliverable.** The KiCad project was removed on
@@ -99,9 +105,10 @@ that a divider would hold low on a flat cap. Full pinout in
 **Plus V2**, whose GPIO8 carries a WS2812B costing ~1 mA in every state, black
 included, with no firmware way to switch it off. The Seeed XIAO ESP32-C3 is the
 same silicon with no user LED and no pixel. It brings out 11 GPIO instead of 13
-— GPIO0 and GPIO1 are missing — so the I²C bus moves to GPIO20/GPIO2 and
-everything else keeps its pin. Pin map, boot and strapping reasoning in
-[gpio_xiao.md](gpio_xiao.md); the matching power chain in
+— GPIO0 and GPIO1 are missing — so the I²C bus moves to GPIO20/GPIO2. The
+e-paper pins moved too, but for a mechanical reason: the panel's header order
+runs straight down D2–D6 so the wire bends lie parallel. Pin map, boot and
+strapping reasoning in [gpio_xiao.md](gpio_xiao.md); the matching power chain in
 `solar_node_xiao.drawio`.
 
 ## Layout
@@ -183,7 +190,7 @@ partway through one.
 | [`gpio.md`](gpio.md) | ESP32-C3 SuperMini pinout and this build's pin map |
 | [`gpio_xiao.md`](gpio_xiao.md) | Seeed XIAO ESP32-C3 pinout — the alternative board, and why |
 | [`solar_node_xiao.drawio`](solar_node_xiao.drawio) | power chain for the XIAO variant: TL431 clamp, HT7533 into `3V3` |
-| [`seed_mini_drawing.svg`](seed_mini_drawing.svg) | the wire traces to bend — A4 Inkscape sheet, the build template |
+| [`seed_mini_drawing.svg`](seed_mini_drawing.svg) | the wire traces to bend — A4 Inkscape sheet, the build template. **Predates the 2026-09-11 e-paper pin reorder** |
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |
 | [`proto_oled_d1_mini.md`](proto_oled_d1_mini.md) | earlier ESP8266 bench rig and its power analysis |
