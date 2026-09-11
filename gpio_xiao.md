@@ -358,9 +358,13 @@ to a different GPIO moves where its wire physically runs. Anything electrically
 free above is free to be routed for the shape as well, which is exactly what the
 e-paper ordering does.
 
-**`seed_mini_drawing.svg` has not caught up.** It still shows DIN→D4, CLK→D2,
-CS→D5, RST→D3 from before the 2026-09-11 reorder. Only DC→D6 and BUSY→D10
-survive. This file is the authority until that drawing is redrawn.
+**`seed_mini_drawing.svg` is half caught up.** Its pin labels were updated for
+the 2026-09-11 reorder and now read DIN→D2, CLK→D3, CS→D4, RST→D5, DC→D6,
+BUSY→D10 in both views. **Its red wire paths were not touched** and still run to
+the old pads, so four of the six e-paper traces land off their label. That is
+left visible on purpose — the paths are the sculpture's geometry, not a
+derivable consequence of the pin map. This file is the authority until they are
+rerouted.
 
 Power chain, the TL431 clamp and the skipped regulator are in
 [solar_node.md](solar_node.md) and `solar_node_xiao.drawio`.
