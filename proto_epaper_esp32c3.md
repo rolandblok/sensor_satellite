@@ -163,10 +163,8 @@ off. Same remedy, same pass — see [gpio.md](gpio.md).
 and no pixel, at a published 43–44 µA. It brings out 11 GPIO instead of 13 —
 GPIO0 and GPIO1 are missing — so the I²C bus moves to `FORCE_SDA 20` /
 `FORCE_SCL 2`. That only fits if the GPIO20 log mirror goes, which means logging
-to flash instead. The e-paper pins differ there as well, ordered to suit the
-wire bends rather than the silicon. **None of that touches the pin map in this
-file**, which is the SuperMini's and is unchanged. Full reasoning in
-[gpio_xiao.md](gpio_xiao.md).
+to flash instead. **The e-paper pins in this file are unchanged and apply to both
+boards.** Full reasoning in [gpio_xiao.md](gpio_xiao.md).
 
 The sketch builds for both — set `BOARD_XIAO 1` and use FQBN
 `esp32:esp32:XIAO_ESP32C3:`**`CDCOnBoot=default`**. That value is not a typo: the
@@ -189,7 +187,7 @@ Unified Sensor**.
 | ------ | ------- | ------- |
 | `BOARD_XIAO` | `0` | 0 = ESP32-C3 SuperMini. 1 = Seeed XIAO — moves the I²C bus and drops the log mirror |
 | `PANEL_V2` | `1` | 1 = V2 board (SSD1680). 0 = V1 (IL3820). |
-| `CYCLE_S` | `300` | seconds between refreshes — keep ≥ 180 |
+| `CYCLE_S` | **`60`** | seconds between refreshes. **Temporarily 60 for debugging, 2026-09-18** — below the panel's ~180 s minimum. Put back to `300` when done |
 | `LOG_S` | `2` | serial log interval when not deep sleeping |
 | `ALTITUDE_M` | `17.0` | Eindhoven, ~17 m AMSL — for sea-level pressure |
 | `MIN_REFRESH_C` | `0.0` | below this the panel is skipped, image kept |
@@ -320,7 +318,9 @@ and hold through the RTC domain; the rest are digital pads and need
 
 With the peripherals unplugged for a sleep measurement, GPIO0/GPIO1 lose the
 BME280 breakout's external pull-ups and GPIO10 loses the panel driving BUSY, so
-all three float. GPIO2 is permanently unconnected by design:
+all three float. On the XIAO build GPIO10 is unconnected permanently — the
+panel's BUSY pad broke on 2026-09-18 and `EPD_BUSY` is `-1` — so it floats
+always and the pull-down matters more, not less. GPIO2 is permanently unconnected by design:
 
 ```c
 // before esp_deep_sleep_start()
@@ -329,7 +329,7 @@ all three float. GPIO2 is permanently unconnected by design:
 pinMode(2,  INPUT_PULLUP);                   // strapping, must be high
 pinMode(0,  INPUT_PULLUP);                   // I2C idles high
 pinMode(1,  INPUT_PULLUP);
-pinMode(10, INPUT_PULLDOWN);                 // BUSY idles low
+pinMode(10, INPUT_PULLDOWN);                 // BUSY idles low (now unconnected)
 
 gpio_hold_en((gpio_num_t)2);                 // per pin
 gpio_hold_en((gpio_num_t)0);
@@ -351,7 +351,10 @@ are hardware, not pin state, and only desoldering removes them.
 Hardware limits, not preferences. They shape the sleep strategy.
 
 * **Minimum refresh interval ~180 s.** Refreshing faster degrades the panel.
-  `CYCLE_S` is 300 s and must not drop below 180 s.
+  The normal value for `CYCLE_S` is 300 s. **It is set to 60 s at the moment for
+  debugging**, which is below the limit: acceptable for a short bench run because
+  the damage is cumulative, not immediate, but it must go back to 300 s before
+  the sculpture is left running.
 * **Hibernate after every refresh.** `display.hibernate()` drops the panel's
   high-voltage rails; leaving them up damages it over time.
 * **Full refresh avoids ghosting.** The firmware does a full-window update each

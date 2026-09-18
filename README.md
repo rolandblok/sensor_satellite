@@ -23,17 +23,13 @@ there is not going to be one.
 traces: an A4 Inkscape sheet, not a schematic and not a layout. It is the
 template for what gets bent.
 
-**Its pin labels are current; its wire paths are not.** Both views were
-relabelled for the 2026-09-11 reorder, but the red traces still run to the pads
-they went to before — four of the six e-paper wires now land a row or two off
-their label. The discrepancy is deliberately left visible rather than guessed at:
-the paths are the sculpture, and rerouting them is a design decision.
+**It matches what is soldered**, labels and paths both, as of 2026-09-18.
 
-**So reroute before bending anything.** The sheet carries two views and they are
-not the same kind of drawing: the left one is the board view, whose wires land in
-strict D2→D6 order down the pin column, and the right one is the routing view,
-where the landing order is shaped for the object. The first could be redrawn
-mechanically; the second cannot.
+Worth knowing if it is ever edited mechanically: the sheet carries two views and
+they are not the same kind of drawing. The left one is the board view, whose
+wires land in strict pin order down the column; the right one is the routing
+view, where the landing order is shaped for the object. The first could be
+redrawn from a pin map, the second cannot.
 
 Two consequences worth carrying into the rest of these notes:
 
@@ -112,9 +108,8 @@ that a divider would hold low on a flat cap. Full pinout in
 included, with no firmware way to switch it off. The Seeed XIAO ESP32-C3 is the
 same silicon with no user LED and no pixel. It brings out 11 GPIO instead of 13
 — GPIO0 and GPIO1 are missing — so the I²C bus moves to GPIO20/GPIO2. The
-e-paper pins moved too, but for a mechanical reason: the panel's header order
-runs straight down D2–D6 so the wire bends lie parallel. Pin map, boot and
-strapping reasoning in [gpio_xiao.md](gpio_xiao.md); the matching power chain in
+e-paper pins are the same on both boards. Pin map, boot and strapping reasoning
+in [gpio_xiao.md](gpio_xiao.md); the matching power chain in
 `solar_node_xiao.drawio`.
 
 ## Layout
@@ -196,7 +191,7 @@ partway through one.
 | [`gpio.md`](gpio.md) | ESP32-C3 SuperMini pinout and this build's pin map |
 | [`gpio_xiao.md`](gpio_xiao.md) | Seeed XIAO ESP32-C3 pinout — the alternative board, and why |
 | [`solar_node_xiao.drawio`](solar_node_xiao.drawio) | power chain for the XIAO variant: TL431 clamp, HT7533 into `3V3` |
-| [`seed_mini_drawing.svg`](seed_mini_drawing.svg) | the wire traces to bend — A4 Inkscape sheet, the build template. **Labels current; red paths still need rerouting** |
+| [`seed_mini_drawing.svg`](seed_mini_drawing.svg) | the wire traces to bend — A4 Inkscape sheet, the build template; matches what is soldered |
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |
 | [`proto_oled_d1_mini.md`](proto_oled_d1_mini.md) | earlier ESP8266 bench rig and its power analysis |

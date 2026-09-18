@@ -21,7 +21,10 @@
 #define PANEL_V2        1      // 1 = Waveshare 2.9" V2 (SSD1680, "V2" on the back)
                                // 0 = original V1 (IL3820)
 #define USE_DEEP_SLEEP  1      // 1 = sleep between cycles; drops the USB serial port
-#define CYCLE_S         300    // seconds between refreshes - keep >= 180 for e-paper
+#define CYCLE_S         60     // TESTING ONLY, 2026-09-18. Normal value is 300.
+                               // BELOW THE PANEL'S ~180 s MINIMUM REFRESH INTERVAL -
+                               // sustained operation here degrades the e-paper. Fine
+                               // for a short bench run, put it back to 300 after.
 #define LOG_S           2      // serial log interval when not deep sleeping
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
 #define MIN_REFRESH_C   0.0f   // below this the panel is skipped, image is kept
@@ -37,35 +40,41 @@
 // D-numbers are the XIAO's silk. They do not correspond to the GPIO numbers in
 // any regular way - D6 is GPIO21 and D7 is GPIO20, adjacent on the chip and on
 // opposite sides of the board. Wire from the GPIO number, not the silk.
-#if BOARD_XIAO
-  // Ordered for the wire bends, not for the silicon. There is no PCB: the
-  // connections are shaped wire that forms the sculpture's structure, so the
-  // panel's header order (DIN CLK CS DC RST) is laid straight down D2..D6 and
-  // the wires run parallel instead of crossing.
-  //
-  // DC and RST are the one deliberate swap. RST cannot take GPIO21: the ROM
-  // bootloader prints its boot log there at every reset and every deep-sleep
-  // wake, and RST is active LOW, so the panel would be hammered with ~8.7 us
-  // reset pulses while hibernating - dragging the SSD1680 out of deep sleep for
-  // ~300 ms of every cycle until display.init() resets it properly. It would
-  // still draw correctly and quietly cost power, which is the one number this
-  // project is chasing. DC is safe there: the C3 drives it, the panel never
-  // does, and nothing latches it.
-  #define EPD_MOSI  4          // D2  DIN
-  #define EPD_SCK   5          // D3  CLK
-  #define EPD_CS    6          // D4
-  #define EPD_RST   7          // D5   <- swapped with DC
-  #define EPD_DC    21         // D6   <- swapped with RST
-#else
-  // DC is on GPIO21, not GPIO3: GPIO3 is the only ADC1 channel left for VSENSE.
-  // GPIO21 is UART0 TX, free here because Serial is USB-CDC on GPIO18/19.
-  #define EPD_SCK   4
-  #define EPD_RST   5
-  #define EPD_MOSI  6
-  #define EPD_CS    7
-  #define EPD_DC    21
-#endif
-#define EPD_BUSY  10           // XIAO D10 - panel-driven, so never GPIO21
+// The e-paper pins are the same on both boards - this is what is soldered on
+// the XIAO as of 2026-09-18, and it matches the SuperMini's wiring.
+//
+// DC is on GPIO21, not GPIO3: GPIO3 is the only ADC1 channel left for VSENSE.
+// GPIO21 is UART0 TX, free here because Serial is USB-CDC on GPIO18/19.
+//
+// GPIO21 must carry DC and nothing else. The ROM bootloader prints its boot log
+// there at every reset and every deep-sleep wake, which is harmless for a line
+// the C3 drives and the panel only reads. RST would be hammered with ~8.7 us
+// pulses while the panel hibernates - it would still draw correctly and quietly
+// cost power, which is the one number this project is chasing. BUSY would be
+// worse: the panel drives it, so the ROM would fight the peripheral.
+#define EPD_SCK   4            // XIAO D2  CLK
+#define EPD_RST   5            // XIAO D3
+#define EPD_MOSI  6            // XIAO D4  DIN
+#define EPD_CS    7            // XIAO D5
+#define EPD_DC    21           // XIAO D6
+
+// BUSY is NOT CONNECTED: the panel's BUSY pad broke off on 2026-09-18.
+// -1 makes GxEPD2 fall back on fixed worst-case delays instead of polling, and
+// for this panel they are tuned close to the measured times - power_on 100 ms
+// against 95.9, full refresh 4100 against 4012, power_off 150 against 140.4.
+// A full refresh costs ~4350 ms blind against ~4248 ms polled, so the whole
+// price is ~100 ms of extra awake time per 300 s cycle, under 2% of the burst.
+//
+// Leaving it as GPIO10 with the pad broken would be far worse than this. The
+// pin would float, and _busy_level is HIGH with a 10 s _busy_timeout: read HIGH
+// and every wait burns the full 10 s - three per refresh, so ~30 s awake
+// instead of 4.3 - while read LOW returns instantly and clocks commands into a
+// panel that is still busy.
+//
+// What is given up: a stuck panel can no longer be detected, and the margin on
+// the refresh delay is ~2%, which is thin only if the panel runs slow. It does
+// that when cold, and this is an indoor sculpture. GPIO10 / D10 is now free.
+#define EPD_BUSY  -1           // was GPIO10 / XIAO D10
 #define EPD_MISO  -1           // MUST be -1, or SPI claims a pin already in use
 
 // I2C bus, pinned rather than auto-detected - the sweep would otherwise drive
@@ -402,7 +411,10 @@ static void unparkPins() {
   // released twice - gpio_hold_dis() is idempotent, so that is harmless.
   const gpio_num_t held[] = {(gpio_num_t)8, (gpio_num_t)2,
                              (gpio_num_t)FORCE_SDA, (gpio_num_t)FORCE_SCL,
-                             (gpio_num_t)EPD_BUSY};
+#if EPD_BUSY >= 0
+                             (gpio_num_t)EPD_BUSY,
+#endif
+                             (gpio_num_t)10};   // ex-BUSY, free but may hold a latch
   for (gpio_num_t p : held) gpio_hold_dis(p);
   gpio_deep_sleep_hold_dis();
 #endif
@@ -430,7 +442,11 @@ static void parkPins() {
 #endif                                         // on the XIAO GPIO2 *is* FORCE_SCL
   pinMode(FORCE_SDA, INPUT_PULLUP);            // I2C idles high
   pinMode(FORCE_SCL, INPUT_PULLUP);            // XIAO: this is GPIO2, strapping
+#if EPD_BUSY >= 0
   pinMode(EPD_BUSY,  INPUT_PULLDOWN);          // BUSY idles low
+#else
+  pinMode(10, INPUT_PULLDOWN);                 // ex-BUSY, unconnected - do not float
+#endif
 
   // A pull set by pinMode alone does not survive deep sleep - the digital
   // domain powers down. Latching is what makes the pull mean anything here.
@@ -439,7 +455,11 @@ static void parkPins() {
 #endif
   gpio_hold_en((gpio_num_t)FORCE_SDA);
   gpio_hold_en((gpio_num_t)FORCE_SCL);
+#if EPD_BUSY >= 0
   gpio_hold_en((gpio_num_t)EPD_BUSY);
+#else
+  gpio_hold_en((gpio_num_t)10);
+#endif
   gpio_deep_sleep_hold_en();
 #endif
 }
