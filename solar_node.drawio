@@ -464,7 +464,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="BENCH TEST — ESP reads Vcap" id="bench-adc">
-        <mxGraphModel dx="2596" dy="1126" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1480" math="0" shadow="0">
+        <mxGraphModel dx="1028" dy="1324" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1480" math="0" shadow="0">
             <root>
                 <mxCell id="a0"/>
                 <mxCell id="a1" parent="a0"/>
@@ -703,7 +703,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="LDO — TO-92 pinout" id="ldo-pinout">
-        <mxGraphModel dx="2596" dy="1126" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1060" math="0" shadow="0">
+        <mxGraphModel dx="874" dy="1125" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1060" math="0" shadow="0">
             <root>
                 <mxCell id="p0"/>
                 <mxCell id="p1" parent="p0"/>

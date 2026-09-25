@@ -19,7 +19,7 @@ Neither change is reflected below.
 
 Pin assignments deliberately do not appear here: the ESP symbol's pins carry net
 names (VSENSE, EPD_DC, SDA, ...), so the 2026-08-28 move of the sense tap to
-GPIO3 and e-paper DC to GPIO21 leaves this file correct.  gpio.md holds the
+GPIO3 and e-paper DC to GPIO21 leaves this file correct.  gpio_xiao.md holds the
 net-name-to-GPIO mapping.
 """
 import os, re, math, uuid as _uuid

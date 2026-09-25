@@ -121,6 +121,8 @@
 #define VDIV_NUM   2.0f    // (R3+R4)/R4
 #define VDIV_CAL   1.0149f // 2026-08-28: DMM 4.81 V vs 4.7962 V, mean of 5 boots
                            // (spread 4.782-4.811, so this is good to ~0.3%)
+                           // 2026-09-25: carries over to the soldered XIAO as
+                           // is, within 0.02 V of the DMM - no per-chip retrim.
 
 #if PANEL_V2
   #define EPD_CLASS GxEPD2_290_T94_V2
@@ -433,7 +435,7 @@ static void parkPins() {
   //
   // An earlier comment here called it a blue LED with 206 uA of drive current,
   // from the 2026-09-03 shunt session that was later thrown out for a ground
-  // loop. That 206 uA is unexplained, not an LED. See gpio.md.
+  // loop. That 206 uA is unexplained, not an LED. See gpio_xiao.md.
 #if !BOARD_XIAO
   pinMode(2,  INPUT_PULLUP);                   // strapping, unconnected by design
 #endif                                         // on the XIAO GPIO2 *is* FORCE_SCL

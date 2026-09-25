@@ -7,7 +7,7 @@ low-Iq LDO → ESP32-C3 + BME280 + 2.9" e-paper.
 | ---- | ---- |
 | `solar_node.pdf` / `.svg` | rendered schematic, nothing needed to view it |
 | `solar_node.drawio` | block diagram and the bench-test wiring sheets |
-| `solar_node_xiao.drawio` | the XIAO variant: TL431 clamp, HT7533 into the `3V3` pin |
+| `solar_node_xiao.drawio` | the power chain as built: TL431 clamp, VCAP into the `5V` pin, and the Vcap sense divider |
 | `tools/gen_schematic.py` | the circuit as code; regenerates the schematic |
 | `tools/scope_log.py` | logs DC measurements off the DS1054Z over LAN to CSV |
 | this file | design notes and measurements, renders on GitHub |
@@ -55,8 +55,8 @@ on paper — the USB feed `D3` and its 22 Ω were never in the schematic, and
 neither is the HT7533 in place of the MCP1700. The sense pin has since moved
 from GPIO2 to GPIO3 and e-paper DC from GPIO3 to GPIO21 (design note 5), which
 `gen_schematic.py` also predates. **The design notes, the drawio and
-[gpio.md](gpio.md) are the current intent; `gen_schematic.py` and the rendered
-PDF/SVG are accurate only up to 2026-08-19.**
+[gpio_xiao.md](gpio_xiao.md) are the current intent; `gen_schematic.py` and the
+rendered PDF/SVG are accurate only up to 2026-08-19.**
 
 ```mermaid
 flowchart LR
@@ -355,9 +355,10 @@ feeding `3V3` directly with the onboard regulator and power LED desoldered.
 Until those are removed, optimising the external part is pointless: the board's
 own 40–100 µA dwarfs the difference between a 1.6 µA and a 4 µA regulator.
 
-**8b. The XIAO needs the HT7533 too — measured 2026-09-04.** This note used to
-say the opposite: that with no power LED and no pixel to desolder, the XIAO could
-skip the external regulator and run off its onboard one. **Measurement says no.**
+**8b. The HT7533 is out of the baseline — but it is worth 10x, measured
+2026-09-04.** The board as soldered has **no external regulator**: VCAP feeds the
+XIAO's `5V` pin through a jumper and the onboard part makes 3V3. That is the
+baseline, and it is not the low-power configuration.
 
 Fed at the `5V` pin, through the onboard regulator, the XIAO's consumption is
 high. Fed at `3V3` from an **HT7533**, with the onboard LED removed, it sleeps at
@@ -366,9 +367,10 @@ excess was the onboard regulator and the LED, not the C3.
 
 That is the first hard evidence for design note 8's assumption, which said the
 onboard part is the wasteful one and admitted it was untested. It is now tested,
-on the XIAO. **So the external LDO stays in the design**, and the end
-configuration is VCAP → HT7533 → the XIAO's `3V3` pin, onboard regulator
-bypassed and LED off the board. See `solar_node_xiao.drawio` and
+on the XIAO. **So fitting an HT7533 is the upgrade to reach for the moment sleep
+current becomes binding**: VCAP → HT7533 → the XIAO's `3V3` pin, onboard
+regulator bypassed and LED off the board — an order of magnitude, for one TO-92
+and two capacitors. It is not fitted today. See `solar_node_xiao.drawio` and
 [gpio_xiao.md](gpio_xiao.md).
 
 Note that feeding `3V3` is only possible *because* an external regulator is
@@ -878,7 +880,7 @@ Working and verified on hardware:
   known property of the variant, not yet a measurement of this board, and the
   1.86 mA sleep floor it would explain came out of the discarded ground-loop
   session. Take it as a load to remove before the redo, not as the answer.
-  Details in [gpio.md](gpio.md).
+  Details in [gpio_xiao.md](gpio_xiao.md).
 * **A XIAO ESP32-C3 sleeps at 40–50 µA on an HT7533, measured 2026-09-04.** The
   first trustworthy sleep figure this project has. Two changes got there, and the
   order matters because they were measured separately: fed at the `5V` pin
@@ -889,9 +891,10 @@ Working and verified on hardware:
 
   This settles two open questions at once. Design note 8 assumed the onboard
   regulator is the wasteful one and said so was untested — it is now tested.
-  And step 3's `5V` versus `3V3` comparison is answered on this board. **The end
-  configuration therefore keeps the external LDO**: VCAP → HT7533 → `3V3`. See
-  design note 8b.
+  And step 3's `5V` versus `3V3` comparison is answered on this board. **The
+  baseline as soldered is nevertheless the `5V` pin and the onboard regulator** —
+  the HT7533 is the upgrade held in reserve, not a fitted part. See design note
+  8b.
 
   Not yet measured on the XIAO: the exact `5V`-fed figure (recorded here only as
   "high"), the HT7533's dropout and so the brownout point, and anything under

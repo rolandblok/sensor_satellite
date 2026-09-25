@@ -62,9 +62,10 @@ memory verified. A cap-only run has been done — 4.7 V down to a 3.04 V brownou
 
 **Sleep current, measured 2026-09-04: 40–50 µA**, on a Seeed XIAO ESP32-C3 fed
 from an HT7533 into its `3V3` pin with the onboard LED removed. Through the
-XIAO's own regulator at the `5V` pin instead it is high, so the external LDO
-stays in the design. The SuperMini's own figure is still unmeasured — its
-2026-09-03 attempt was discarded for a ground loop.
+XIAO's own regulator at the `5V` pin instead it is high. **The soldered build has
+no HT7533** — VCAP goes to the `5V` pin and the onboard regulator makes 3V3 — so
+that 40–50 µA is what an external LDO would buy, not what the sculpture draws
+today.
 
 Not yet done: the overvoltage clamp, unfitted on either board; logging to flash,
 which the XIAO build needs before it can do a cap-power run at all; and the
@@ -99,7 +100,7 @@ XIAO's dropout, and so its brownout point.
 DC is on GPIO21, not GPIO3: GPIO3 is the one ADC1 channel left for the
 supercapacitor divider, and GPIO2 — the obvious alternative — is a strapping pin
 that a divider would hold low on a flat cap. Full pinout in
-[gpio.md](gpio.md); pin budget, module strapping (BME280 `CSB`/`SDO`, e-paper
+[gpio_xiao.md](gpio_xiao.md); pin budget, module strapping (BME280 `CSB`/`SDO`, e-paper
 `BS`) and board gotchas in
 [proto_epaper_esp32c3.md](proto_epaper_esp32c3.md).
 
@@ -198,10 +199,11 @@ sketch never running, so an upload cannot lose. Both buttons are on the XIAO.
 
 **Seeed's documented procedure — "hold BOOT and connect to the PC" — does not
 work on this build.** It assumes USB is the power source, so plugging in *is* the
-power-on. Here the board is fed from the HT7533 into `3V3`, so USB appearing or
-disappearing never resets anything and the strapping is never sampled. If the
-RESET button is unreachable inside the sculpture, briefly interrupt the `3V3`
-feed instead — that is the reset.
+power-on. Here the board runs off the supercap at the `5V` pin, with USB
+unplugged and the jumper closed, so USB appearing or disappearing never resets
+anything and the strapping is never sampled. If the RESET button is unreachable
+inside the sculpture, briefly open the VCAP jumper instead — that is the
+reset.
 
 On the older cap-powered SuperMini rig the equivalent is pulling the VCAP wire
 off `5V` first, for the same reason.
@@ -223,9 +225,8 @@ partway through one.
 | [`proto_oled_esp32c3/`](proto_oled_esp32c3/) | sensor-only build, serial logging, no display |
 | [`i2c_scan/`](i2c_scan/) | I²C scanner; sweeps every pin pair to find the bus |
 | [`logger_d1_mini/`](logger_d1_mini/) | D1 mini witness logger — relays the node's log on cap power, second Vcap ADC, OLED readout |
-| [`gpio.md`](gpio.md) | ESP32-C3 SuperMini pinout and this build's pin map |
-| [`gpio_xiao.md`](gpio_xiao.md) | Seeed XIAO ESP32-C3 pinout — the alternative board, and why |
-| [`solar_node_xiao.drawio`](solar_node_xiao.drawio) | power chain for the XIAO variant: TL431 clamp, HT7533 into `3V3` |
+| [`gpio_xiao.md`](gpio_xiao.md) | Seeed XIAO ESP32-C3 pinout and this build's pin map — the single truth for pins |
+| [`solar_node_xiao.drawio`](solar_node_xiao.drawio) | power chain as built: TL431 clamp, VCAP into the `5V` pin, Vcap sense divider |
 | [`seed_mini_drawing.svg`](seed_mini_drawing.svg) | the wire traces to bend — A4 Inkscape sheet, the build template; matches what is soldered |
 | [`project.md`](project.md) | original design concept |
 | [`proto_epaper_esp32c3.md`](proto_epaper_esp32c3.md) | current build: wiring, firmware, bring-up |

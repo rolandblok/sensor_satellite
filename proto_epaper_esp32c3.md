@@ -157,7 +157,7 @@ Desolder it before the battery build.
 **And this board has a second one.** It is a SuperMini **Plus V2**: GPIO8 carries
 a WS2812B RGB pixel rather than a plain blue LED, and the pixel's controller
 draws ~1 mA from 3V3 in every state, black included. Firmware cannot switch it
-off. Same remedy, same pass — see [gpio.md](gpio.md).
+off. Same remedy, same pass — see [gpio_xiao.md](gpio_xiao.md).
 
 **Or change board.** A Seeed XIAO ESP32-C3 is the same silicon with no user LED
 and no pixel, at a published 43–44 µA. It brings out 11 GPIO instead of 13 —

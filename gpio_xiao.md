@@ -1,11 +1,10 @@
 # Seeed XIAO ESP32-C3 — pinout
 
-**As of 2026-09-04 this board is on the bench, flashed and measured.** The
-SuperMini is still the older build; see [gpio.md](gpio.md) for it. This file
-exists because the SuperMini in hand turned out to be a **Plus V2**, whose GPIO8
-WS2812B costs ~1 mA in every state and cannot be switched off in firmware. The
-XIAO is the same silicon with none of that — and with an HT7533 in front of it,
-it sleeps at **40–50 µA**.
+**This is the board, and the only board in the design.** Flashed and measured
+since 2026-09-04, soldered into the sculpture since 2026-09-18. This file exists
+because the ESP32-C3 SuperMini it replaced turned out to be a **Plus V2**, whose
+GPIO8 WS2812B costs ~1 mA in every state and cannot be switched off in firmware.
+The XIAO is the same silicon with none of that.
 
 Same chip — ESP32-C3, single RISC-V core, 4 MB flash, native USB, no serial
 chip. Different board: 14 pins instead of 16, **11 GPIO instead of 13**, a u.FL
@@ -53,48 +52,51 @@ the board is **CHG**, tied to the battery charger, and **it has been desoldered*
 (2026-09-04). That is the entire reason this file exists.
 
 Published deep sleep is **43–44 µA**, against the 0.6–1.5 mA the Plus V2 is stuck
-at — and this board now measures **40–50 µA asleep** on an HT7533, LED removed,
-so the published figure holds up. Getting there needed the external regulator;
+at — and on the bench, fed through an HT7533 with the LED removed, this board
+measured **40–50 µA asleep**, so the published figure holds up. **The soldered
+build has no HT7533** and runs on the onboard regulator, which costs far more;
 see *Power pins* below.
 
 ## Power pins
 
 | Pin | What it is |
 | --- | ---------- |
-| `5V` | VBUS, and also the **charge IC's input**. Feeding it back-feeds a connected USB host. **Not used in this build.** |
-| `3V3` | Onboard LDO output, 700 mA — but here it is an **input**, driven by the external HT7533, bypassing the onboard part. Max 3.6 V. |
+| `5V` | VBUS, and also the **charge IC's input**. **This is where VCAP feeds the board**, through a jumper — and feeding it back-feeds a connected USB host, so the jumper and USB are never closed together. |
+| `3V3` | Onboard LDO output, 700 mA — an output here, as designed. Max 3.6 V if an external regulator ever drives it instead. |
 | `GND` | One pad. |
 
 There are also **B+ / B− pads on the underside** for a single-cell LiPo, with a
-charge IC rated 380 mA fast / 40 mA trickle. This build does not use them, and
-feeding `3V3` keeps them out of the circuit along with the rest of the `5V` pin.
+charge IC rated 380 mA fast / 40 mA trickle. No battery is fitted — but feeding
+the `5V` pin does put the charge IC's input on the supercap rail. See the
+gotchas.
 
-### The external LDO is required — measured 2026-09-04
+### No external LDO — and what fitting one would buy
 
-The first draft of this file assumed the opposite: with no power LED and no pixel
-to desolder, the XIAO looked like it could skip the external regulator. It
-cannot.
+**No HT7533 is fitted.** VCAP feeds the `5V` pin through a jumper and the onboard
+regulator makes 3V3. That is the board as soldered, and it is the baseline.
 
-Fed at the `5V` pin through the onboard regulator, consumption is high. Refitted
-with an **HT7533 into the `3V3` pin**, and with the onboard LED removed, it
-sleeps at **40–50 µA** — Seeed's published figure, so essentially the entire
-excess was the onboard regulator and the LED rather than the C3.
+It is not the low-power configuration, and the gap is measured. On 2026-09-04,
+fed at the `5V` pin through the onboard regulator, consumption was high; refitted
+with an **HT7533 into the `3V3` pin**, onboard LED removed, the same board slept
+at **40–50 µA** — Seeed's published figure, so essentially the whole excess was
+the onboard regulator and the LED rather than the C3.
 
-Note that feeding `3V3` is only possible *because* the HT7533 is fitted. VCAP
-runs 4.6 V down to ~3.0 V and the pin tops out at 3.6 V, so the choice was never
-"3V3 direct or onboard LDO" — it was which regulator, and the external one wins
-by an order of magnitude. Design note 8b in [solar_node.md](solar_node.md).
+So the HT7533 is the upgrade to reach for if sleep current becomes the binding
+constraint, and it is worth an order of magnitude. Fitting it means driving `3V3`
+directly, which is only safe *because* a regulator is in front of it: VCAP runs
+4.6 V down to ~3.0 V and the pin tops out at 3.6 V. Design note 8b in
+[solar_node.md](solar_node.md).
 
 ## As wired in this build
 
-VCAP feeds the **HT7533**, whose output feeds `3V3`. The `5V` pin is unused and
-the onboard regulator is bypassed.
+VCAP feeds the `5V` pin through a jumper, and the onboard regulator makes `3V3`
+for the C3, the BME280 and the e-paper. There is no external regulator.
 
 ```
                                     /--USB-C--\
-  BME280 SCL ------ D0  GPIO2   ----|         |---- 5V                 unused
+  BME280 SCL ------ D0  GPIO2   ----|         |---- 5V           <---  VCAP, via jumper
   VSENSE tap ------ D1  GPIO3   ----|         |---- GND          ----  common ground
-  e-paper CLK ----- D2  GPIO4   ----|         |---- 3V3          <---  HT7533 out, and
+  e-paper CLK ----- D2  GPIO4   ----|         |---- 3V3          --->  onboard LDO out,
                                     |         |                        BME280 + e-paper VCC
   e-paper RST ----- D3  GPIO5   ----|         |---- GPIO10  D10        free - was BUSY, pad broke
   e-paper DIN ----- D4  GPIO6   ----|         |---- GPIO9   D9         free (BOOT button)
@@ -318,16 +320,17 @@ the flash logger exists. That part is not written.
 
 ## Gotchas
 
-**The charger is on the `5V` pin — which is why this build does not use it.**
-The charge IC's input sits on `5V` alongside VBUS. Feeding `3V3` instead bypasses
-both it and the onboard regulator, which is what the 40–50 µA depends on. Seeed
-still publishes no quiescent figure for the charger; the measurement bounds it at
-"small" rather than identifying it.
+**The charger sits on the `5V` pin, and this build feeds that pin.** The charge
+IC's input is on `5V` alongside VBUS, so the supercap sees it with no battery on
+B+/B− to charge. Seeed publishes no quiescent figure for it, and the 40–50 µA
+measurement does not bound it — that run fed `3V3` through an HT7533 and bypassed
+the charger along with the onboard regulator.
 
-**Do not feed `3V3` and USB at the same time without thinking.** With USB
-plugged, VBUS drives the onboard regulator onto the same `3V3` node the HT7533 is
-driving — two regulators in parallel, the higher one winning and the other seeing
-reverse. Fine for a moment while flashing; not something to leave connected.
+**Never close the VCAP jumper with USB plugged in.** The `5V` pin is VBUS, so a
+charged supercap drives the host's 5 V rail and the host charges the cap back
+through the same wire. Open the jumper to flash, close it to run. If an HT7533
+into `3V3` is ever fitted, the equivalent hazard is two regulators in parallel on
+the `3V3` node, the higher one winning and the other seeing reverse.
 
 **The `CDCOnBoot` values are INVERTED against the SuperMini's board definition.**
 This one costs an afternoon. `arduino-cli board details` for each:
