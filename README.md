@@ -150,6 +150,26 @@ The XIAO's board definition labels `CDCOnBoot=default` as *Enabled* and
 `CDCOnBoot=cdc` as *Disabled* — the opposite of the SuperMini. Carry the wrong
 one over and the board flashes, verifies and prints nothing.
 
+### Flashing with esptool directly: do not skip `boot_app0`
+
+Deep sleep makes the port exist for only ~5 s per `CYCLE_S`, and `arduino-cli
+upload` spends longer than that starting up, so it loses the race. Calling
+`esptool.exe` against pre-built images wins it. **But it must write all four
+images, not three:**
+
+```
+0x0      <sketch>.ino.bootloader.bin
+0x8000   <sketch>.ino.partitions.bin
+0xe000   tools/partitions/boot_app0.bin     <-- easy to forget
+0x10000  <sketch>.ino.bin
+```
+
+`boot_app0.bin` is the OTA-select data that tells the bootloader to run app0.
+Omit it and the selection is whatever was already in flash, so the board can run
+something other than what you just wrote — while still reporting a verified
+hash. Diagnosed 2026-09-25 after a partial flash left the panel blinking without
+drawing; rewriting all four fixed it.
+
 ### Deep sleep costs you casual reflashing
 
 With `USE_DEEP_SLEEP 1` the node is awake for about 5 s out of every `CYCLE_S`
@@ -164,12 +184,27 @@ flash). No port, nothing to open, nothing to reset.
 
 Two ways round it:
 
-**BOOT button — deterministic.** Hold BOOT (GPIO9) while power-cycling, then
-release. GPIO9 low at boot puts the ROM in download mode, where it waits
-indefinitely with the port enumerated and the sketch never running. Upload
-normally from there. On cap power this means pulling the VCAP wire off `5V`
-first and plugging USB with BOOT held — otherwise it is not a fresh power-on and
-the strapping is never sampled.
+**BOOT button — deterministic.** GPIO9 is a **strapping pin, sampled once, at
+the instant the chip leaves reset**. Nothing polls it afterwards, so holding it
+while the board is already running does nothing at all. It only counts if a
+reset happens while it is held:
+
+```
+hold BOOT  ->  tap RESET  ->  release RESET  ->  release BOOT
+```
+
+The ROM then sits in download mode indefinitely with the port enumerated and the
+sketch never running, so an upload cannot lose. Both buttons are on the XIAO.
+
+**Seeed's documented procedure — "hold BOOT and connect to the PC" — does not
+work on this build.** It assumes USB is the power source, so plugging in *is* the
+power-on. Here the board is fed from the HT7533 into `3V3`, so USB appearing or
+disappearing never resets anything and the strapping is never sampled. If the
+RESET button is unreachable inside the sculpture, briefly interrupt the `3V3`
+feed instead — that is the reset.
+
+On the older cap-powered SuperMini rig the equivalent is pulling the VCAP wire
+off `5V` first, for the same reason.
 
 **Catch the wake window.** Less fragile than the duty cycle suggests: you only
 have to win the first instant, because once esptool opens the port and asserts

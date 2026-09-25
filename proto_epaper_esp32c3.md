@@ -187,7 +187,7 @@ Unified Sensor**.
 | ------ | ------- | ------- |
 | `BOARD_XIAO` | `0` | 0 = ESP32-C3 SuperMini. 1 = Seeed XIAO — moves the I²C bus and drops the log mirror |
 | `PANEL_V2` | `1` | 1 = V2 board (SSD1680). 0 = V1 (IL3820). |
-| `CYCLE_S` | **`60`** | seconds between refreshes. **Temporarily 60 for debugging, 2026-09-18** — below the panel's ~180 s minimum. Put back to `300` when done |
+| `CYCLE_S` | `300` | seconds between refreshes — keep ≥ 180. Measured cycle 308.3 s, see below |
 | `LOG_S` | `2` | serial log interval when not deep sleeping |
 | `ALTITUDE_M` | `17.0` | Eindhoven, ~17 m AMSL — for sea-level pressure |
 | `MIN_REFRESH_C` | `0.0` | below this the panel is skipped, image kept |
@@ -351,10 +351,10 @@ are hardware, not pin state, and only desoldering removes them.
 Hardware limits, not preferences. They shape the sleep strategy.
 
 * **Minimum refresh interval ~180 s.** Refreshing faster degrades the panel.
-  The normal value for `CYCLE_S` is 300 s. **It is set to 60 s at the moment for
-  debugging**, which is below the limit: acceptable for a short bench run because
-  the damage is cumulative, not immediate, but it must go back to 300 s before
-  the sculpture is left running.
+  `CYCLE_S` is 300 s and must not drop below 180 s. It was run at 60 s briefly
+  for debugging on 2026-09-18 and restored on 2026-09-25; the damage is
+  cumulative rather than immediate, so a short bench run is acceptable, but it
+  is not a state to leave the sculpture in.
 * **Hibernate after every refresh.** `display.hibernate()` drops the panel's
   high-voltage rails; leaving them up damages it over time.
 * **Full refresh avoids ghosting.** The firmware does a full-window update each
@@ -414,12 +414,63 @@ oversampling or filtering.
 5. **Measure current** on the 3V3 rail, during refresh and idle. These numbers
    size the solar panel.
 6. **Enable deep sleep** last. Confirm the boot counter increments and min/max
-   persist, proving RTC memory works. **Done 2026-08-30** — `boot #3` with
-   `tMin`/`tMax` carried across, read over the GPIO20 mirror.
+   persist, proving RTC memory works. **Done 2026-08-30 on the SuperMini** —
+   `boot #3` with `tMin`/`tMax` carried across, read over the GPIO20 mirror.
+   **It does NOT hold on the XIAO — see below.**
 
-Step 6 was in fact done before step 5: deep sleep went on while the 3V3 current
-measurements were still outstanding. Harmless here, but it means the sleep
-figures below are still the datasheet estimate and not this board's.
+### Measured cycle — 2026-09-25, XIAO
+
+`CYCLE_S 300`, measured by watching the USB port appear and disappear across
+three consecutive cycles:
+
+| | |
+| --- | --- |
+| Wake-to-wake | **308.3 s**, twice over, to the tenth of a second |
+| Awake | **~9.1 s** |
+| Asleep | ~299.2 s |
+| Duty cycle | **3.0%** |
+
+The period is `CYCLE_S` plus the awake time, because the timer is armed at the
+*end* of the cycle rather than at the start — so 300 s of sleep, not a 300 s
+period. Worth knowing if the rhythm ever needs to line up with anything.
+
+The ~9.1 s awake breaks down as roughly 0.3 s startup, ~0.2 s I²C and sensor,
+and two full panel refresh cycles at ~4.35 s each — `display.init()` is called
+with `initial = true`, so every wake clears the panel before drawing it. That
+doubles the refresh work and is the largest single item in the energy budget once
+sleep current is dealt with; `false` on a wake would halve it.
+
+The precision is itself informative: a supply sagging under the refresh load
+would never keep time that well, so an irregular period is a symptom worth
+chasing rather than a normal variation.
+
+### Reading the log over USB-CDC resets the boot counter — 2026-09-25
+
+A caution about measurement, not a fault. Three consecutive wakes captured over
+USB-CDC all reported `boot #1` with `tMin`/`tMax` collapsed onto the current
+reading, which looked exactly like RTC memory failing to survive deep sleep.
+
+**It was the reading that did it.** Opening the port resets the C3 — and
+deasserting DTR and RTS is not enough to prevent it, which is the part that
+misleads. Every capture was therefore a fresh cold boot, so `bootCount` was
+always 1 and min/max always started over. Watching the panel instead, with
+nothing attached to the port, the counter advances normally.
+
+So: **to check anything that lives in RTC memory, read it off the panel, not off
+the serial port.** The same caveat applies to any wake-to-wake timing taken by
+opening the port.
+
+One dead end recorded so that it is not re-tried: the suspected fix was to force
+the RTC memory power domain on before sleeping, but it does not compile on this
+chip —
+
+```
+error: 'ESP_PD_DOMAIN_RTC_FAST_MEM' was not declared in this scope;
+       did you mean 'ESP_PD_DOMAIN_RC_FAST'?
+```
+
+`ESP_PD_DOMAIN_RC_FAST` is a clock, not memory. The C3 does not expose RTC fast
+memory as a separately controllable domain. There was nothing to fix.
 
 ### Expected current
 

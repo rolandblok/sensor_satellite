@@ -21,10 +21,7 @@
 #define PANEL_V2        1      // 1 = Waveshare 2.9" V2 (SSD1680, "V2" on the back)
                                // 0 = original V1 (IL3820)
 #define USE_DEEP_SLEEP  1      // 1 = sleep between cycles; drops the USB serial port
-#define CYCLE_S         60     // TESTING ONLY, 2026-09-18. Normal value is 300.
-                               // BELOW THE PANEL'S ~180 s MINIMUM REFRESH INTERVAL -
-                               // sustained operation here degrades the e-paper. Fine
-                               // for a short bench run, put it back to 300 after.
+#define CYCLE_S         300    // seconds between refreshes - keep >= 180 for e-paper
 #define LOG_S           2      // serial log interval when not deep sleeping
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
 #define MIN_REFRESH_C   0.0f   // below this the panel is skipped, image is kept
@@ -519,6 +516,12 @@ void setup() {
   mark("parkPins enter");
   parkPins();
   mark("parkPins returned - sleeping now");
+
+  // RTC memory works. If a serial capture ever shows "boot #1" on every wake,
+  // that is the capture: opening the USB-CDC port resets the chip even with DTR
+  // and RTS deasserted, so each read is a cold boot. Check the counter on the
+  // panel instead. Measured 2026-09-25.
+
   esp_sleep_enable_timer_wakeup((uint64_t)CYCLE_S * 1000000ULL);
   esp_deep_sleep_start();      // does not return; setup() runs again on wake
 #endif
