@@ -100,7 +100,7 @@ for the C3, the BME280 and the e-paper. There is no external regulator.
                                     |         |                        BME280 + e-paper VCC
   e-paper RST ----- D3  GPIO5   ----|         |---- GPIO10  D10        free - was BUSY, pad broke
   e-paper DIN ----- D4  GPIO6   ----|         |---- GPIO9   D9         free (BOOT button)
-  e-paper CS ------ D5  GPIO7   ----|         |---- GPIO8   D8         free
+  e-paper CS ------ D5  GPIO7   ----|         |---- GPIO8   D8   ----  10k to 3V3 (strap pull-up)
   e-paper DC ------ D6  GPIO21  ----|         |---- GPIO20  D7   ----  BME280 SDA
                                     | [u.FL]  |
                                     \---------/
@@ -117,11 +117,26 @@ for the C3, the BME280 and the e-paper. There is no external regulator.
 | e-paper | DC | GPIO21 | D6 | same |
 | e-paper | ~~BUSY~~ | — | — | **not connected** — see below |
 | BME280 | SDA | GPIO20 | D7 | **moved**, from GPIO0 |
-| — | free | GPIO8, GPIO9, GPIO10 | D8, D9, D10 | — |
+| 10k resistor | pull-up to 3V3 | GPIO8 | D8 | **added** 2026-09-27 |
+| — | free | GPIO9, GPIO10 | D9, D10 | — |
 
-Eight signals into eleven pins, three spare. Two differences from the SuperMini:
-the I²C bus, because GPIO0 and GPIO1 are not bonded out here, and BUSY, which is
-not wired at all.
+Eight signals into eleven pins, two spare, plus a pull-up on the third. Two
+differences from the SuperMini: the I²C bus, because GPIO0 and GPIO1 are not
+bonded out here, and BUSY, which is not wired at all.
+
+### D8 has a 10k pull-up to 3V3 — added 2026-09-27
+
+GPIO8 is a strapping pin that must be HIGH at reset, and until now nothing but
+the chip's weak internal pull held it there. A **10k from D8 to 3V3** makes that
+explicit, so the pin is never left floating at reset.
+
+**It costs nothing as long as the firmware never drives D8 LOW.** Current through
+the resistor is (3V3 − V_D8) / 10k: zero with the pin as a high-Z input, which is
+how the sketch leaves it — awake, asleep, and across the wake reset — and ~330 µA
+only if something pulled it low. Driving D8 HIGH would also be zero, so there is
+nothing to gain by doing that, and a `gpio_hold_en()` on a strapping pin is a
+latch you then have to remember to clear. **Leave GPIO8 untouched**, as
+`parkPins()` already does, and never use it for anything that idles LOW.
 
 ### BUSY is not connected — the pad broke, 2026-09-18
 
@@ -245,7 +260,7 @@ over unchanged.
 | Pin | Carries | Held high by |
 | --- | ------- | ------------ |
 | GPIO2 | SCL | the I²C bus pull-up, continuously — power-on, sleep and wake alike |
-| GPIO8 | nothing | unconnected, stock configuration |
+| GPIO8 | nothing | the external 10k pull-up to 3V3 (since 2026-09-27) |
 | GPIO9 | nothing | the BOOT button's external pull-up, stock |
 
 **The real hazard is the hold latches, not the boot levels.** `gpio_hold_en()`
