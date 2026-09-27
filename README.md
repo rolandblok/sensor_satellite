@@ -171,10 +171,113 @@ something other than what you just wrote — while still reporting a verified
 hash. Diagnosed 2026-09-25 after a partial flash left the panel blinking without
 drawing; rewriting all four fixed it.
 
+### Low-power hold, and the charge trend on the panel
+
+The node will not spend the cap when there is not enough in it. Vcap is read as
+the **first** thing in `setup()`, before Serial, I²C, SPI or the panel, and the
+gate decides from there:
+
+| Vcap | What happens |
+| ---- | ------------ |
+| ≥ `VCAP_RESUME` 3.80 V | normal cycling, every `CYCLE_S` |
+| < `VCAP_HOLD` 3.50 V | cycling stops; one "LOW POWER" frame, then `HOLD_S` polls |
+| < `VCAP_FLOOR` 3.25 V | hold without even drawing the frame — too close to brownout |
+
+Why it is needed: 4 F is enormous next to this load, so a failed boot costs only
+**~1.5 mV**. A brownout reset therefore leaves Vcap where it was, the node
+retries immediately, and it loops at ~20 mA — walking the cap down ~5 mV/s until
+the chip can no longer start. Measured brownout for this configuration is
+**3.04 V** (2026-08-30 cap-only run). A full cycle costs ~70 mV of the pack; a
+held-off wake costs ~3 mV, which is what makes waiting affordable. The gap
+between 3.50 and 3.80 V is the hysteresis, and it is what stops the node
+oscillating across a single threshold.
+
+**The footer shows what the sleep gained** — a drawn triangle plus the delta in
+mV, with a ±20 mV deadband so ADC spread does not produce a flickering arrow.
+This is deliberately the *sleep* delta, Vcap now against Vcap when the last cycle
+finished, not wake-to-wake: it is harvest with this node's own consumption
+excluded, which is the number that answers "is there enough light". A flat bar is
+break-even; the cycle's own ~−70 mV cost is in the log, not on the panel.
+
+Indoor harvest measured 2–4 mA at low cap voltage (2026-08-21, both panels), and
+break-even for a 300 s cycle is roughly **1.0–1.5 mA**, so the trend arrow is
+expected to sit near flat indoors and go negative in poor light. Neither the
+awake current nor this configuration's sleep current is measured yet, so that
+break-even figure is an estimate.
+
+### The flash log
+
+Serial goes nowhere on cap power — USB is unplugged and the GPIO20 mirror is
+compiled out on this board — so every wake writes **one 16-byte record into the
+`spiffs` data partition** instead. No filesystem is mounted: the partition is
+used as a plain append-only array of fixed slots, one `esp_partition_write` per
+wake, sectors erased lazily just before first use so no single operation costs
+more than one 4 kB erase.
+
+`spiffs` is at 0x290000 and is 1.375 MB, which is **90,111 records — about 313
+days** at a 300 s cycle. A normal sketch upload does not touch that partition, so
+**the log survives reflashing**; only an explicit `--erase-all` or the `e` command
+clears it.
+
+Each record holds Vcap at the top of `setup()` and Vcap immediately before sleep,
+which is what makes the log answer the question it exists for:
+
+| Derived at dump time | Meaning |
+| -------------------- | ------- |
+| `dv_sleep_mV` | this boot's Vcap minus the **previous** record's sleep Vcap — harvest alone, with this node's own consumption excluded |
+| `dv_cycle_mV` | sleep Vcap minus boot Vcap — what the update itself cost, normally about −70 mV |
+| `net_uA` | `C·dV/dt` over `slept_s`, so it stays correct across a 900 s hold poll as well as a 300 s cycle |
+
+**`incomplete` is the column to sort on.** An attempt that never reaches its
+sleep writes no record — so before the expensive part starts, the boot voltage
+goes into RTC memory as a breadcrumb, and the *next* boot notices it and emits a
+record flagged `LF_INCOMPLETE` with `v_sleep_mV = 0`. That turns a brownout
+part-way through an update from a silence into a row saying "this starting
+voltage was not enough", which is exactly what sets `VCAP_HOLD` and `VCAP_FLOOR`
+empirically rather than by the reasoning above.
+
+Held-off polls are logged too, flagged `held`, so the recovery curve during a
+hold is visible and not just its endpoints. A brownout *during* a held poll is
+not recorded — a poll costs ~3 mV, so reaching one means the cap was already at
+the floor.
+
+#### Reading it out: hold BOOT
+
+**Download mode is not how you read the log.** `hold BOOT → tap RESET → release
+BOOT` parks the ROM bootloader with the sketch never running, so nothing can dump
+anything. That mode is for *uploading*. GPIO9 is only *sampled* at the instant
+reset is released — nothing looks at it afterwards — and that gap is what
+separates the two jobs:
+
+| You want | Do this | Because |
+| -------- | ------- | ------- |
+| **Flash new firmware** | hold BOOT, tap RESET, release BOOT | GPIO9 low *at* reset → ROM download mode, sketch never runs |
+| **Read the log** | tap RESET, **then** hold BOOT | GPIO9 high at reset → sketch runs → sketch reads GPIO9 low → console mode |
+
+In console mode the board **prints its status and does not sleep**, so there is no
+window to miss and no race to win. The way out is RESET. It is checked *before*
+the hold gate, deliberately: the gate's whole job is to sleep without bringing
+Serial up, and a flat cap is precisely when you most want the log.
+
+```
+# BOOT held - console mode, this board will not sleep.
+# d = dump log, e = erase log, c = continue (cycle then sleep). Waiting 5 s...
+```
+
+The prompt re-offers itself after each command, so dump, look, erase, dump again
+without resetting between.
+
+There is also a **passive window on every cold boot**, if you would rather not
+touch BOOT: plug USB in with the jumper open (that is a power-on) and the sketch
+waits up to 2 s for either the terminal to assert DTR **or any byte to arrive** —
+two triggers, because not every terminal asserts DTR, so mashing a key while it
+boots always works. A timer wake never offers it; nobody is listening, and the
+check costs nothing when no host is there.
+
 ### Deep sleep costs you casual reflashing
 
-With `USE_DEEP_SLEEP 1` the node is awake for about 5 s out of every `CYCLE_S`
-(300 s by default) — a 1.7% duty cycle. For the rest of it **COM5 does not
+With `USE_DEEP_SLEEP 1` the node is awake for about 9 s out of every `CYCLE_S`
+(300 s by default) — a 3% duty cycle. For the rest of it **COM5 does not
 exist**. The C3 has no USB-serial chip; the port is the on-chip USB-Serial-JTAG
 peripheral, and deep sleep unpowers it. `arduino-cli board list` shows only the
 logger's COM3.
@@ -213,9 +316,23 @@ have to win the first instant, because once esptool opens the port and asserts
 reset the sketch is gone and the pending sleep never happens. Poll for the port
 and fire the upload the moment it appears.
 
-Either way, **reflashing wipes RTC memory** — `bootCount` returns to 0 and
-`tMin`/`tMax` reset. Change `CYCLE_S` before starting a discharge run, not
-partway through one.
+**But not while the node is held off.** A held-off wake never calls
+`Serial.begin()` — that is the point of it — so it is ~0.3 s of ADC read every
+`HOLD_S` (900 s) and the port never enumerates at all. There is no window to
+catch. **Below 3.50 V, BOOT + RESET is the only way in**, and if the cap is above
+`VCAP_FLOOR` the panel will be showing the LOW POWER frame, which is how you can
+tell from across the room which case you are in.
+
+Plugging USB in with the jumper open is also a power-on, and a cold boot always
+runs one full cycle regardless of the gate — a human pressing RESET or applying
+power gets a frame and a log line. So that gives a ~9 s window even on a weak
+cap. Do not lean on it repeatedly at low voltage: each press costs a full cycle
+plus, on the next timer wake, another hold frame — roughly 90 mV of the pack.
+
+Either way, **reflashing wipes RTC memory** — `bootCount` returns to 0,
+`tMin`/`tMax` reset, the hold latch clears, and `vcapPrev` is gone so the first
+frame after a flash has no trend arrow. Change `CYCLE_S` before starting a
+discharge run, not partway through one.
 
 ## Contents
 

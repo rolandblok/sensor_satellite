@@ -16,6 +16,7 @@
 #include <Fonts/FreeSansBold24pt7b.h>
 #include <esp_sleep.h>
 #include <driver/gpio.h>
+#include <esp_partition.h>
 
 // ---------------- config ----------------
 #define PANEL_V2        1      // 1 = Waveshare 2.9" V2 (SSD1680, "V2" on the back)
@@ -23,6 +24,9 @@
 #define USE_DEEP_SLEEP  1      // 1 = sleep between cycles; drops the USB serial port
 #define CYCLE_S         300    // seconds between refreshes - keep >= 180 for e-paper
 #define LOG_S           2      // serial log interval when not deep sleeping
+#define FW_VERSION      "v1.0" // shown small, bottom right of every frame. Bump it
+                               // when reflashing, so a panel photograph says
+                               // which build produced it.
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
 #define MIN_REFRESH_C   0.0f   // below this the panel is skipped, image is kept
 
@@ -117,12 +121,43 @@
 // left alone here - see parkPins() below.
 #define PARK_PINS       1
 
+// The BOOT button, read as an ordinary input. GPIO9 is a strapping pin, but it
+// is only *sampled* at the instant reset is released - nothing looks at it
+// afterwards - so the ROM's download mode and this are not in conflict: hold it
+// during reset and the sketch never runs; hold it after reset and the sketch
+// sees it. That is the difference between flashing and reading the log.
+//
+// Deliberately not added to parkPins(): a latched level on a strapping pin lives
+// in the RTC domain and survives a reflash, and a hold stuck LOW here would
+// force download mode on every boot and look like a dead board. Whether GPIO9
+// floats during deep sleep, and what that costs, is worth a measurement.
+#define BOOT_PIN   9       // XIAO D9
+
 #define VSENSE_PIN 3       // XIAO D1 - ADC1_3 on both boards
 #define VDIV_NUM   2.0f    // (R3+R4)/R4
 #define VDIV_CAL   1.0149f // 2026-08-28: DMM 4.81 V vs 4.7962 V, mean of 5 boots
                            // (spread 4.782-4.811, so this is good to ~0.3%)
                            // 2026-09-25: carries over to the soldered XIAO as
                            // is, within 0.02 V of the DMM - no per-chip retrim.
+#define CAP_F      4.0f    // supercap, for turning dV per cycle into a current
+
+// ---------------- low-power hold ----------------
+// Hysteresis around the brownout point, and the reason it is needed: 4 F is
+// enormous next to this load, so a failed boot costs only ~1.5 mV. The brownout
+// reset therefore leaves Vcap exactly where it was, the node retries at once,
+// and it loops at ~20 mA - walking the cap down ~5 mV/s until the chip can no
+// longer start at all. Every one of those attempts buys zero readings.
+// Measured brownout for this configuration is 3.04 V (2026-08-30 cap-only run).
+//
+// The fix is to spend the cap only when there is enough in it. A full cycle
+// costs ~70 mV of the 4 F pack - 9.1 s awake, most of it the 4.3 s refresh. A
+// held-off wake costs ~3 mV, because it reads the divider and goes straight
+// back to sleep without touching Serial, SPI or the panel.
+#define VCAP_HOLD    3.50f // cycling stops below this
+#define VCAP_RESUME  3.80f // and does not restart until this - the hysteresis
+#define VCAP_FLOOR   3.25f // below this, do not even spend a refresh saying so
+#define HOLD_S       900   // poll interval while held off
+#define TREND_MV     20.0f // trend deadband; boot-to-boot ADC spread is +-15 mV
 
 #if PANEL_V2
   #define EPD_CLASS GxEPD2_290_T94_V2
@@ -139,6 +174,18 @@ Adafruit_BME280 bme;
 RTC_DATA_ATTR uint32_t bootCount = 0;
 RTC_DATA_ATTR float    tMin      =  999.0f;
 RTC_DATA_ATTR float    tMax      = -999.0f;
+RTC_DATA_ATTR float    vcapPrev  = 0.0f;   // last wake's Vcap - the trend needs it
+RTC_DATA_ATTR bool     holding   = false;  // the hysteresis latch
+RTC_DATA_ATTR uint32_t holdPolls = 0;      // consecutive held-off wakes
+RTC_DATA_ATTR uint32_t sleptS    = CYCLE_S;// how long the last sleep was, so the
+                                           // trend can be stated as a current
+// Flash log bookkeeping. logHead is a cache - it is re-derived from flash on any
+// boot that cannot trust it, so losing RTC costs a binary search, not the log.
+RTC_DATA_ATTR uint32_t logHead      = 0;   // next free slot, 0 = "ask flash"
+RTC_DATA_ATTR uint16_t vSleepPrevMv = 0;   // Vcap at the previous sleep
+RTC_DATA_ATTR uint32_t pendSeq      = 0;   // nonzero = a cycle is in flight
+RTC_DATA_ATTR uint16_t pendVbootMv  = 0;   // ...and the Vcap it started from
+RTC_DATA_ATTR uint8_t  pendFlags    = 0;
 
 static int8_t  sdaPin = -1, sclPin = -1;
 static uint8_t bmeAddr = 0;
@@ -149,12 +196,64 @@ static bool    bmeOk  = false;
 struct Reading {
   float tC, rh, hPa, hPaSea, dewC;
   float vcap;
+  float dv;          // Vcap now minus Vcap at the previous wake
+  bool  haveTrend;   // false on the first wake after a cold boot
 };
+
+// Which frame refresh() should paint.
+enum FrameKind { FRAME_OK, FRAME_NOSENSOR, FRAME_HOLD };
+
+// ---------------- flash log ----------------
+// The panel is bistable and USB is unplugged on cap power, so without this a
+// night run leaves exactly one frame and no history. Records go into the
+// `spiffs` data partition, which nothing else in this sketch touches, as a plain
+// append-only array of fixed 16-byte slots - no filesystem to mount, no metadata
+// to rewrite, one 16-byte write per wake.
+//
+// Slot 0 is a header. Records start at slot 1. Sectors are erased lazily, just
+// before the first slot in one is used, so no single operation costs more than
+// one 4096-byte erase.
+#define LOG_MAGIC    0x53415431UL  // "SAT1" in slot 0, or the partition is virgin
+#define LOG_SLOT     16            // bytes per slot; flash writes want 4-byte alignment
+#define LOG_PER_SECT (4096 / LOG_SLOT)
+
+// Flags. LF_INCOMPLETE is the important one: it is written on the *next* boot,
+// for an attempt that never reached its sleep. That is how a brownout part-way
+// through an update leaves a trace instead of a silence - which is the whole
+// point of the exercise, since the question is which starting voltages fail.
+#define LF_COLD       0x01   // power-on, RESET or brownout - not a timer wake
+#define LF_HELD       0x02   // held-off poll; no update attempted
+#define LF_BME_OK     0x04
+#define LF_REFRESHED  0x08   // the panel was actually redrawn
+#define LF_HOLDFRAME  0x10   // the LOW POWER frame was drawn
+#define LF_INCOMPLETE 0x20   // this attempt never finished - see above
+
+struct __attribute__((packed)) LogRec {
+  uint32_t seq;        // 0xFFFFFFFF in an erased slot; LOG_MAGIC in slot 0
+  uint16_t vBootMv;    // Vcap at the top of setup(), before anything powers up
+  uint16_t vSleepMv;   // Vcap immediately before deep sleep; 0 if never reached
+  int16_t  tCc;        // centi-degrees C; INT16_MIN for no reading
+  uint16_t rhD;        // relative humidity in 0.1 %
+  uint16_t sleptS;     // the sleep that preceded this boot
+  uint8_t  flags;
+  uint8_t  bootN;      // low byte of bootCount - spots an RTC loss
+};
+static_assert(sizeof(LogRec) == LOG_SLOT, "LogRec must stay one slot");
+
+static LogRec gRec;                  // filled through the wake, written at sleep
+static const esp_partition_t *gPart = nullptr;
+
 
 // ---------------- logging ----------------
 // Everything goes to both ports. Cheap insurance: a line that only reaches USB
 // is a line that does not exist during a cap run.
+// False until the ports are open. A held-off wake never opens them - it reads
+// the divider and sleeps - so every log call on that path has to be free, and
+// mark()'s delay(15) especially so.
+static bool logUp = false;
+
 static void logBoth(const char *fmt, ...) {
+  if (!logUp) return;
   char buf[192];
   va_list ap;
   va_start(ap, fmt);
@@ -174,6 +273,7 @@ static void logBoth(const char *fmt, ...) {
 // Progress marker. Flushes, because the point is to survive a hang in the
 // very next call - anything left in the TX FIFO would be lost.
 static void mark(const char *what) {
+  if (!logUp) return;
   logBoth("# mark: %s\n", what);
 #if USE_LOG_MIRROR
   Serial0.flush();
@@ -182,6 +282,181 @@ static void mark(const char *what) {
   Serial.flush();
 #endif
   delay(15);                   // let the last byte clear the shift register
+}
+
+// ---------------- flash log ----------------
+static const esp_partition_t *logPart() {
+  if (!gPart)
+    gPart = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                     ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
+  return gPart;
+}
+
+static uint32_t logSlots() {
+  const esp_partition_t *pt = logPart();
+  return pt ? pt->size / LOG_SLOT : 0;
+}
+
+static bool logReadSlot(uint32_t slot, LogRec *out) {
+  const esp_partition_t *pt = logPart();
+  if (!pt || slot >= logSlots()) return false;
+  return esp_partition_read(pt, slot * LOG_SLOT, out, LOG_SLOT) == ESP_OK;
+}
+
+// Erase sector 0 and stamp the header. Only reached on a virgin partition, or on
+// one holding something unrecognised - which can only be an old filesystem,
+// since nothing else in this sketch writes flash.
+static bool logInit() {
+  const esp_partition_t *pt = logPart();
+  if (!pt) return false;
+  if (esp_partition_erase_range(pt, 0, 4096) != ESP_OK) return false;
+  LogRec h = {};
+  h.seq     = LOG_MAGIC;
+  h.vBootMv = LOG_SLOT;
+  return esp_partition_write(pt, 0, &h, LOG_SLOT) == ESP_OK;
+}
+
+// First slot whose seq is still erased. Binary search, so re-deriving the head
+// after an RTC loss costs ~17 reads instead of a scan of the whole partition.
+static uint32_t logFindHead() {
+  const uint32_t n = logSlots();
+  if (n < 2) return 0;
+  LogRec r;
+  if (!logReadSlot(0, &r)) return 0;
+  if (r.seq != LOG_MAGIC) {                                      // virgin, or not ours
+    if (!logInit()) return 0;
+    return 1;
+  }
+  if (!logReadSlot(1, &r) || r.seq == 0xFFFFFFFFUL) return 1;    // header only
+  uint32_t lo = 1, hi = n;              // lo is used; hi is free or past the end
+  while (hi - lo > 1) {
+    const uint32_t mid = lo + (hi - lo) / 2;
+    if (logReadSlot(mid, &r) && r.seq != 0xFFFFFFFFUL) lo = mid; else hi = mid;
+  }
+  return lo + 1;
+}
+
+static bool logAppend(LogRec &r) {
+  const esp_partition_t *pt = logPart();
+  if (!pt) return false;
+  if (logHead == 0) logHead = logFindHead();
+  if (logHead == 0 || logHead >= logSlots()) return false;   // no partition, or full
+
+  // Lazy erase: landing on the first slot of a sector means it is still dirty.
+  if (logHead % LOG_PER_SECT == 0 &&
+      esp_partition_erase_range(pt, logHead * LOG_SLOT, 4096) != ESP_OK)
+    return false;
+
+  r.seq = logHead;
+  if (esp_partition_write(pt, logHead * LOG_SLOT, &r, LOG_SLOT) != ESP_OK)
+    return false;
+  logHead++;
+  return true;
+}
+
+static void logFlashStatus() {
+  const esp_partition_t *pt = logPart();
+  if (!pt) { logBoth("# flash log: no spiffs partition - NOT LOGGING\n"); return; }
+  if (logHead == 0) logHead = logFindHead();
+  const uint32_t n = logSlots();
+  logBoth("# flash log: %s, %lu/%lu slots, ~%lu days left at %d s\n",
+                pt->label, (unsigned long)logHead, (unsigned long)n,
+                (unsigned long)((n - logHead) / (86400UL / CYCLE_S)), CYCLE_S);
+}
+
+// CSV to whichever port is listening. dv_sleep is what the sleep gained - the
+// light signal, with the cycle's own consumption excluded - and dv_cycle is what
+// the update cost. Both are derived here rather than stored, so a record stays
+// 16 bytes and the arithmetic can be fixed without reflashing.
+static void logDump() {
+  const uint32_t n = logSlots();
+  if (logHead == 0) logHead = logFindHead();
+  logBoth("# flash log dump: %lu records\n",
+                (unsigned long)(logHead > 1 ? logHead - 1 : 0));
+  logBoth("seq,flags,cold,held,incomplete,refreshed,bootN,slept_s,"
+          "v_boot_mV,v_sleep_mV,dv_sleep_mV,dv_cycle_mV,net_uA,T_C,RH_pct\n");
+  uint16_t prevSleep = 0;
+  LogRec r;
+  for (uint32_t i = 1; i < logHead && i < n; i++) {
+    if (!logReadSlot(i, &r) || r.seq == 0xFFFFFFFFUL) break;
+    const int32_t dvSleep = prevSleep ? (int32_t)r.vBootMv - (int32_t)prevSleep : 0;
+    const int32_t dvCycle = r.vSleepMv ? (int32_t)r.vSleepMv - (int32_t)r.vBootMv : 0;
+    const float   netUA   = (prevSleep && r.sleptS)
+                          ? CAP_F * (dvSleep / 1000.0f) / (float)r.sleptS * 1e6f : 0.0f;
+    logBoth("%lu,0x%02X,%d,%d,%d,%d,%u,%u,%u,%u,%+ld,%+ld,%+.0f,",
+                  (unsigned long)r.seq, r.flags,
+                  (r.flags & LF_COLD) ? 1 : 0, (r.flags & LF_HELD) ? 1 : 0,
+                  (r.flags & LF_INCOMPLETE) ? 1 : 0, (r.flags & LF_REFRESHED) ? 1 : 0,
+                  r.bootN, r.sleptS, r.vBootMv, r.vSleepMv,
+                  (long)dvSleep, (long)dvCycle, netUA);
+    if (r.tCc == INT16_MIN) logBoth(",\n");
+    else                    logBoth("%.2f,%.1f\n", r.tCc / 100.0f, r.rhD / 10.0f);
+    if (r.vSleepMv) prevSleep = r.vSleepMv;   // an incomplete attempt breaks the chain
+  }
+  logBoth("# end of dump\n");
+}
+
+static void logErase() {
+  const esp_partition_t *pt = logPart();
+  if (!pt) return;
+  logBoth("# erasing %lu bytes, this takes a moment...\n", (unsigned long)pt->size);
+  Serial.flush();
+  if (esp_partition_erase_range(pt, 0, pt->size) == ESP_OK && logInit()) {
+    logHead      = 1;
+    vSleepPrevMv = 0;
+    logBoth("# flash log erased\n");
+  } else {
+    logBoth("# ERASE FAILED\n");
+  }
+}
+
+// Command window, offered only when a USB host actually has the port open - so a
+// cap-powered wake with nothing listening pays nothing for it. Opening the port
+// resets the C3, so by the time this runs the terminal is already there and the
+// character can be sent straight away.
+// True once somebody is listening. Two independent triggers, because one is not
+// enough: `Serial` only goes true when the terminal asserts DTR, which not every
+// terminal does, so any received byte counts as well - meaning you can always
+// force the window by mashing a key while it boots. Only ever called on a cold
+// boot, so a cap-powered timer wake never pays for the wait.
+static bool hostPresent() {
+  for (int i = 0; i < 40; i++) {          // up to ~2 s
+    if (Serial || Serial.available()) return true;
+    delay(50);
+  }
+  return false;
+}
+
+// Returns true if it did something, so the caller can offer the window again -
+// dump, look, erase, dump again, without a reset between each.
+static bool serveCommands() {
+  logBoth("# d = dump log, e = erase log, c = continue (cycle then sleep)."
+          " Waiting 5 s...\n");
+  const uint32_t until = millis() + 5000;
+  while ((int32_t)(millis() - until) < 0) {
+    if (!Serial.available()) { delay(20); continue; }
+    const int c = Serial.read();
+    if (c == 'd') { logDump();  return true; }
+    if (c == 'e') { logErase(); return true; }
+    if (c == 'c') return false;
+  }
+  logBoth("# no command, continuing\n");
+  return false;
+}
+
+// Held BOOT means "do not sleep, I want to read the log". Stays here forever,
+// so there is no window to miss and no race to win - the way out is RESET.
+// Reached even when the hold gate would otherwise have slept immediately, which
+// is the point: a flat cap is exactly when you most want to read the log.
+static void consoleMode(const Reading &sense) {
+  logBoth("\n# BOOT held - console mode, this board will not sleep.\n");
+  logBoth("# Vcap %.3f V, boot #%lu\n", sense.vcap, (unsigned long)bootCount);
+  logFlashStatus();
+  logBoth("# release BOOT now; press RESET to leave console mode.\n");
+  for (;;) {
+    serveCommands();
+    delay(50);
+  }
 }
 
 // ---------------- bus discovery ----------------
@@ -305,6 +580,57 @@ static void drawRight(const char *s, int16_t xRight, int16_t y) {
   display.print(s);
 }
 
+// Trend marker. The GFX fonts here are ASCII only - no arrow glyphs - so the
+// triangle is drawn. Inside the deadband it is a bar: a 4 F cap moves ~70 mV per
+// cycle when the node is losing ground, so +-20 mV of ADC spread is genuinely
+// "flat" and an arrow that flickered on noise would teach the wrong thing.
+static void drawTrend(int16_t x, int16_t yBase, float dv) {
+  const float mv = dv * 1000.0f;
+  if (mv >  TREND_MV)      display.fillTriangle(x, yBase, x + 10, yBase, x + 5, yBase - 9, GxEPD_BLACK);
+  else if (mv < -TREND_MV) display.fillTriangle(x, yBase - 9, x + 10, yBase - 9, x + 5, yBase, GxEPD_BLACK);
+  else                     display.fillRect(x, yBase - 6, 10, 2, GxEPD_BLACK);
+}
+
+// Header is shared by every frame: what this is, Vcap, and the boot counter.
+static void drawHeader(const Reading &r) {
+  char buf[32];
+  display.setFont(&FreeSans9pt7b);
+  display.setCursor(4, 15);
+  display.print("sensor satellite");
+  snprintf(buf, sizeof(buf), "%.2f V   #%lu", r.vcap, (unsigned long)bootCount);
+  drawRight(buf, display.width() - 4, 15);
+  display.drawFastHLine(0, 21, display.width(), GxEPD_BLACK);
+}
+
+// Firmware version, bottom right corner, half the height of the min/max line.
+// The built-in 5x7 font at size 1 is that half, and unlike every GFX font here
+// it is positioned by its TOP-left corner rather than its baseline.
+#define FW_VER_W ((int16_t)(6 * (sizeof(FW_VERSION) - 1)))
+
+static void drawVersion() {
+  display.setFont(NULL);
+  display.setTextSize(1);
+  display.setCursor(display.width() - 2 - FW_VER_W, display.height() - 9);
+  display.print(FW_VERSION);
+  display.setFont(&FreeSans9pt7b);      // restore for whatever draws next
+}
+
+// Footer right: is the cap gaining or losing between wakes. This is the whole
+// "is there enough light" readout - mV per cycle, with the arrow for direction.
+// Right-aligned clear of the version, not to the panel edge.
+static void drawTrendFooter(const Reading &r) {
+  if (!r.haveTrend) return;
+  char buf[16];
+  int16_t bx, by; uint16_t bw, bh;
+  const int16_t y     = display.height() - 6;
+  const int16_t xEdge = display.width() - 6 - FW_VER_W;
+  snprintf(buf, sizeof(buf), "%+.0f mV", r.dv * 1000.0f);
+  display.getTextBounds(buf, 0, y, &bx, &by, &bw, &bh);
+  display.setCursor(xEdge - bw, y);
+  display.print(buf);
+  drawTrend(xEdge - bw - 15, y, r.dv);
+}
+
 static void drawFrame(bool ok, const Reading &r) {
   char buf[32];
   const int16_t W = display.width();     // 296 in landscape
@@ -313,13 +639,7 @@ static void drawFrame(bool ok, const Reading &r) {
   display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
 
-  // header
-  display.setFont(&FreeSans9pt7b);
-  display.setCursor(4, 15);
-  display.print("sensor satellite");
-  snprintf(buf, sizeof(buf), "%.2f V   #%lu", r.vcap, (unsigned long)bootCount);
-  drawRight(buf, W - 4, 15);
-  display.drawFastHLine(0, 21, W, GxEPD_BLACK);
+  drawHeader(r);
 
   if (!ok) {
     display.setFont(&FreeSansBold9pt7b);
@@ -330,6 +650,7 @@ static void drawFrame(bool ok, const Reading &r) {
     display.print("BME280 not on I2C");
     display.setCursor(4, 104);
     display.print("check CSB->3V3, SDO->GND, power");
+    drawVersion();
     return;
   }
 
@@ -354,40 +675,91 @@ static void drawFrame(bool ok, const Reading &r) {
   display.setCursor(4, H - 6);
   snprintf(buf, sizeof(buf), "min %.1f   max %.1f", tMin, tMax);
   display.print(buf);
+  drawTrendFooter(r);
+  drawVersion();
+}
+
+// The frame the node leaves on the panel while it waits for light. It is drawn
+// once, on entry to the hold, and the panel keeps it with no power - so the
+// sculpture explains its own silence for as long as the silence lasts.
+static void drawHoldFrame(const Reading &r) {
+  char buf[40];
+  const int16_t H = display.height();
+  display.fillScreen(GxEPD_WHITE);
+  display.setTextColor(GxEPD_BLACK);
+  drawHeader(r);
+
+  display.setFont(&FreeSansBold9pt7b);
+  display.setCursor(4, 48);
+  display.print("LOW POWER - waiting for light");
+
+  display.setFont(&FreeSans9pt7b);
+  display.setCursor(4, 72);
+  snprintf(buf, sizeof(buf), "cycling stops below %.2f V", VCAP_HOLD);
+  display.print(buf);
+  display.setCursor(4, 92);
+  snprintf(buf, sizeof(buf), "resumes at %.2f V, checked every %d min",
+           VCAP_RESUME, HOLD_S / 60);
+  display.print(buf);
+
+  display.drawFastHLine(0, H - 22, display.width(), GxEPD_BLACK);
+  display.setFont(&FreeSans9pt7b);
+  display.setCursor(4, H - 6);
+  snprintf(buf, sizeof(buf), "min %.1f   max %.1f", tMin, tMax);
+  display.print(buf);
+  drawTrendFooter(r);
+  drawVersion();
 }
 
 // Full refresh. At CYCLE_S >= 180 s this is within spec and avoids the
 // ghosting bookkeeping that partial updates need.
-static void refresh(bool ok, const Reading &r) {
+static void refresh(FrameKind kind, const Reading &r) {
   mark("refresh entered");
   display.setFullWindow();
   display.firstPage();
-  do { drawFrame(ok, r); } while (display.nextPage());
+  do {
+    if (kind == FRAME_HOLD) drawHoldFrame(r);
+    else                    drawFrame(kind == FRAME_OK, r);
+  } while (display.nextPage());
   display.hibernate();      // drop the panel's HV rails - required between updates
 }
 
 // ---------------- logging ----------------
 static void logHeader() {
-  logBoth("# t_s,T_C,RH_pct,dew_C,P_station_hPa,P_sea_hPa,Tmin_C,Tmax_C,Vcap_V\n");
+  logBoth("# t_s,T_C,RH_pct,dew_C,P_station_hPa,P_sea_hPa,Tmin_C,Tmax_C,"
+          "Vcap_V,dVcap_mV,net_uA\n");
+}
+
+// net_uA is the honest form of the trend: I = C dV/dt across the sleep that
+// just ended, so it is a real harvest-minus-consumption figure, and it stays
+// correct when the last sleep was a HOLD_S poll rather than a CYCLE_S cycle.
+static float netCurrentUA(const Reading &r) {
+  if (!r.haveTrend || sleptS == 0) return 0.0f;
+  return CAP_F * r.dv / (float)sleptS * 1e6f;
 }
 
 static void logReading(const Reading &r) {
-  logBoth("%.1f,%.2f,%.1f,%.1f,%.2f,%.2f,%.1f,%.1f,%.3f\n",
+  logBoth("%.1f,%.2f,%.1f,%.1f,%.2f,%.2f,%.1f,%.1f,%.3f,%+.0f,%+.0f\n",
                 millis() / 1000.0f,
-                r.tC, r.rh, r.dewC, r.hPa, r.hPaSea, tMin, tMax, r.vcap);
+                r.tC, r.rh, r.dewC, r.hPa, r.hPaSea, tMin, tMax, r.vcap,
+                r.haveTrend ? r.dv * 1000.0f : 0.0f, netCurrentUA(r));
 }
 
-static void runCycle() {
-  Reading r = {};
-  r.vcap = readVcap();          // before the sensor: valid even on a read failure
+// Vcap is passed in rather than read here: setup() reads it first thing,
+// because whether this runs at all depends on it.
+static void runCycle(const Reading &sense) {
+  Reading r = sense;
   if (!bmeRead(r)) {
     logBoth("# BME280 read failed - showing fault frame (Vcap %.3f V)\n", r.vcap);
-    refresh(false, r);
+    refresh(FRAME_NOSENSOR, r);
     return;
   }
 
   if (r.tC < tMin) tMin = r.tC;
   if (r.tC > tMax) tMax = r.tC;
+  gRec.flags |= LF_BME_OK;
+  gRec.tCc    = (int16_t)(r.tC * 100.0f + (r.tC < 0 ? -0.5f : 0.5f));
+  gRec.rhD    = (uint16_t)(r.rh * 10.0f + 0.5f);
   logReading(r);
 
   // E-paper refresh is unreliable below freezing. The panel is bistable, so
@@ -397,7 +769,8 @@ static void runCycle() {
                   r.tC, MIN_REFRESH_C);
     return;
   }
-  refresh(true, r);
+  refresh(FRAME_OK, r);
+  gRec.flags |= LF_REFRESHED;
 }
 
 // Parked pins are latched across deep sleep; the hold must be released before a
@@ -463,8 +836,126 @@ static void parkPins() {
 #endif
 }
 
+// Park the pins and sleep. Does not return. Every exit from setup() comes
+// through here, so nothing can sleep with the pads left floating - and nothing
+// can sleep without its record reaching flash.
+static void sleepFor(uint32_t seconds) {
+  // Vcap one last time, as late as possible: paired with vBootMv this is what
+  // the wake actually cost, and it is the denominator for everything the log is
+  // meant to answer.
+  gRec.vSleepMv = (uint16_t)(readVcap() * 1000.0f + 0.5f);
+  if (!logAppend(gRec))
+    logBoth("# flash log append FAILED - full, or no partition\n");
+  vSleepPrevMv = gRec.vSleepMv;
+  pendSeq      = 0;            // this attempt finished; nothing to report next boot
+
+  mark("parkPins enter");
+  parkPins();
+  mark("parkPins returned - sleeping now");
+  sleptS = seconds;
+  esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
+  esp_deep_sleep_start();      // does not return; setup() runs again on wake
+}
+
 void setup() {
   unparkPins();
+
+  // Vcap before anything else is powered up. A held-off wake has to be cheap to
+  // be worth making, and everything below this line - Serial, I2C, SPI, the
+  // panel - is what makes a wake expensive. Reading the divider needs none of
+  // it. RTC memory carries the previous reading, so the trend costs nothing.
+  Reading sense = {};
+  sense.vcap      = readVcap();
+  sense.haveTrend = (vSleepPrevMv > 0);
+  // The trend the panel shows is the sleep delta, not wake-to-wake: it is Vcap
+  // now against Vcap when the last cycle finished, so it is harvest alone with
+  // this node's own consumption excluded. That is the number that answers
+  // "is there enough light".
+  sense.dv        = sense.haveTrend
+                  ? sense.vcap - vSleepPrevMv / 1000.0f : 0.0f;
+  vcapPrev        = sense.vcap;
+
+  // Counted here rather than after Serial comes up, because a held-off wake
+  // never gets that far and would otherwise be invisible. So this is every
+  // wake, and LF_HELD is what separates a poll from an update.
+  bootCount++;
+
+  // Read before the hold gate, because the gate's whole job is to sleep without
+  // bringing Serial up - and a flat cap is precisely when the log is worth
+  // reading. Held BOOT overrides the gate.
+  pinMode(BOOT_PIN, INPUT_PULLUP);
+  delayMicroseconds(200);              // let the pull-up win against stray charge
+  const bool bootHeld = (digitalRead(BOOT_PIN) == LOW);
+
+  gRec          = LogRec();
+  gRec.vBootMv  = (uint16_t)(sense.vcap * 1000.0f + 0.5f);
+  gRec.tCc      = INT16_MIN;
+  gRec.sleptS   = (uint16_t)sleptS;
+  gRec.bootN    = (uint8_t)bootCount;
+
+#if USE_DEEP_SLEEP
+  // A cold boot is a human event - power applied, or RESET pressed - so someone
+  // is watching and wants a frame and a log line. A timer wake is the machine
+  // loop, where thrift is the point.
+  const bool coldBoot =
+      (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_TIMER);
+  if (coldBoot) holding = false;
+  if (coldBoot) gRec.flags |= LF_COLD;
+
+  // An attempt was in flight when the lights went out. Record it before doing
+  // anything else, because this is the datum the whole log exists for: a boot
+  // voltage that was not enough to finish an update.
+  if (pendSeq != 0) {
+    LogRec dead  = LogRec();
+    dead.vBootMv = pendVbootMv;
+    dead.vSleepMv = 0;                 // never got there
+    dead.tCc     = INT16_MIN;
+    dead.flags   = pendFlags | LF_INCOMPLETE;
+    dead.bootN   = (uint8_t)bootCount;
+    logAppend(dead);
+    pendSeq = 0;
+  }
+
+  // BOOT held beats every power consideration below: USB is plugged in if
+  // somebody is pressing buttons, so there is nothing to conserve.
+  if (bootHeld) {
+    Serial.begin(115200);
+    delay(300);
+    logUp = true;
+    consoleMode(sense);                // never returns
+  }
+
+  // The anti-thrash guard, and the only branch that runs below the brownout
+  // point: no Serial, no SPI, no panel, whatever woke us. A 4.3 s refresh here
+  // costs ~20 mV, which is exactly what a cap this low cannot spare - and it
+  // catches the repeated-brownout case, where every reset looks like a cold
+  // boot and would otherwise buy another full cycle.
+  if (sense.vcap < VCAP_FLOOR) {
+    holding      = true;
+    holdPolls++;
+    gRec.flags  |= LF_HELD;
+    sleepFor(HOLD_S);          // logs on the way out, like every other exit
+  }
+
+  // Hysteresis. Held off, it takes VCAP_RESUME to start cycling again; running,
+  // it takes a drop below VCAP_HOLD to stop. The gap is what stops the node
+  // oscillating across a single threshold.
+  bool enterHold = false;
+  if (!coldBoot) {
+    if (holding) {
+      if (sense.vcap < VCAP_RESUME) {
+        holdPolls++;
+        gRec.flags |= LF_HELD;
+        sleepFor(HOLD_S);      // still waiting - cheapest possible wake
+      }
+      holding = false;         // recovered
+    } else if (sense.vcap < VCAP_HOLD) {
+      holding   = true;
+      enterHold = true;        // say so on the panel once, then hold
+    }
+  }
+#endif
+
   Serial.begin(115200);
 #if USE_LOG_MIRROR
   // UART0 TX remapped to GPIO20. Must come before display.init(): UART0's
@@ -472,9 +963,10 @@ void setup() {
   // back off the UART matrix afterwards.
   Serial0.begin(LOG_BAUD, SERIAL_8N1, -1, LOG_TX_PIN);
 #endif
+  logUp = true;
   delay(300);                  // let USB-CDC enumerate before the first print
-  bootCount++;
-  logBoth("\n# proto_epaper_esp32c3  boot #%lu\n", (unsigned long)bootCount);
+  logBoth("\n# proto_epaper_esp32c3 " FW_VERSION "  boot #%lu\n",
+                (unsigned long)bootCount);
   logBoth("# radios never initialised - WiFi and BLE PHY unpowered\n");
   mark("serial up");
 
@@ -503,35 +995,69 @@ void setup() {
                 PANEL_V2 ? "V2 / SSD1680" : "V1 / IL3820");
 
   logBoth("# Vcap sense: GPIO%d, divider x%.2f, cal %.3f -> %.3f V now\n",
-                VSENSE_PIN, VDIV_NUM, VDIV_CAL, readVcap());
+                VSENSE_PIN, VDIV_NUM, VDIV_CAL, sense.vcap);
+#if USE_DEEP_SLEEP
+  if (sense.haveTrend)
+    logBoth("# trend: %+.0f mV over the last %lu s -> net %+.0f uA\n",
+                  sense.dv * 1000.0f, (unsigned long)sleptS,
+                  netCurrentUA(sense));
+  logBoth("# hold gate: %.2f V, stop < %.2f, resume >= %.2f, floor %.2f, "
+          "%lu polls held\n",
+                sense.vcap, VCAP_HOLD, VCAP_RESUME, VCAP_FLOOR,
+                (unsigned long)holdPolls);
+  logFlashStatus();
+
+  // Only a cold boot offers the console: a timer wake has nobody listening.
+  if (coldBoot && hostPresent())
+    while (serveCommands()) { }        // keep offering until told to continue
+
+  if (enterHold) {
+    logBoth("# below %.2f V - one frame, then holding, %d s per poll\n",
+                  VCAP_HOLD, HOLD_S);
+    gRec.flags |= LF_HELD | LF_HOLDFRAME;
+    refresh(FRAME_HOLD, sense);
+    Serial.flush();
+    sleepFor(HOLD_S);
+  }
+  holdPolls = 0;
+#endif
 
   logHeader();
 
 #if USE_DEEP_SLEEP
+  // From here on the expensive part runs. Leave a breadcrumb in RTC so that if
+  // the rail collapses mid-update, the next boot can log that it happened.
+  pendSeq     = 1;
+  pendVbootMv = gRec.vBootMv;
+  pendFlags   = gRec.flags;
+
   mark("runCycle enter");
-  runCycle();
+  runCycle(sense);
   logBoth("# sleeping %d s\n", CYCLE_S);
   Serial.flush();
 #if USE_LOG_MIRROR
   Serial0.flush();
 #endif
-  mark("parkPins enter");
-  parkPins();
-  mark("parkPins returned - sleeping now");
-
   // RTC memory works. If a serial capture ever shows "boot #1" on every wake,
   // that is the capture: opening the USB-CDC port resets the chip even with DTR
   // and RTS deasserted, so each read is a cold boot. Check the counter on the
   // panel instead. Measured 2026-09-25.
 
-  esp_sleep_enable_timer_wakeup((uint64_t)CYCLE_S * 1000000ULL);
-  esp_deep_sleep_start();      // does not return; setup() runs again on wake
+  sleepFor(CYCLE_S);
 #endif
 }
 
 void loop() {
 #if !USE_DEEP_SLEEP
-  runCycle();
+  // No hold gate on this path: without deep sleep the board is on USB at a
+  // bench, and there is no cap to protect.
+  Reading sense = {};
+  sense.vcap      = readVcap();
+  sense.haveTrend = (vcapPrev > 0.1f);
+  sense.dv        = sense.haveTrend ? sense.vcap - vcapPrev : 0.0f;
+  vcapPrev        = sense.vcap;
+  sleptS          = CYCLE_S;
+  runCycle(sense);
   delay((uint32_t)CYCLE_S * 1000UL);
 #endif
 }
