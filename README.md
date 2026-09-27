@@ -117,13 +117,13 @@ in [gpio_xiao.md](gpio_xiao.md); the matching power chain in
 
 ```
 +--------------------------------------------------+
-| sensor satellite                   4.21 V    #42 |
+| sensor satellite          4.21 V  ^ 34 mV    #42 |
 |--------------------------------------------------|
 |                                       56 % RH    |
 |   21.8 C                             1019 hPa    |
 |                                    dew 10.4 C    |
 |--------------------------------------------------|
-| min 18.2   max 23.9                              |
+| min 18.2   max 23.9                         v1.1 |
 +--------------------------------------------------+
 ```
 
@@ -192,8 +192,11 @@ held-off wake costs ~3 mV, which is what makes waiting affordable. The gap
 between 3.50 and 3.80 V is the hysteresis, and it is what stops the node
 oscillating across a single threshold.
 
-**The footer shows what the sleep gained** — a drawn triangle plus the delta in
-mV, with a ±20 mV deadband so ADC spread does not produce a flickering arrow.
+**The header shows what the sleep gained**, right after Vcap: a drawn triangle
+plus the delta in mV, with a ±20 mV deadband so ADC spread does not produce a
+flickering arrow. The delta and the boot counter are in the same small font as
+the version number. The triangle carries the direction, so the number is printed
+unsigned; a signed number next to the flat bar used to read as a double minus.
 This is deliberately the *sleep* delta, Vcap now against Vcap when the last cycle
 finished, not wake-to-wake: it is harvest with this node's own consumption
 excluded, which is the number that answers "is there enough light". A flat bar is

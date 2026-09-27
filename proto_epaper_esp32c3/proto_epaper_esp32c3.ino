@@ -24,7 +24,7 @@
 #define USE_DEEP_SLEEP  1      // 1 = sleep between cycles; drops the USB serial port
 #define CYCLE_S         300    // seconds between refreshes - keep >= 180 for e-paper
 #define LOG_S           2      // serial log interval when not deep sleeping
-#define FW_VERSION      "v1.0" // shown small, bottom right of every frame. Bump it
+#define FW_VERSION      "v1.1" // shown small, bottom right of every frame. Bump it
                                // when reflashing, so a panel photograph says
                                // which build produced it.
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
@@ -591,44 +591,55 @@ static void drawTrend(int16_t x, int16_t yBase, float dv) {
   else                     display.fillRect(x, yBase - 6, 10, 2, GxEPD_BLACK);
 }
 
-// Header is shared by every frame: what this is, Vcap, and the boot counter.
+// Small print: the built-in 5x7 font at size 1, half the height of the 9 pt
+// lines. Unlike every GFX font here it is positioned by its TOP-left corner
+// rather than its baseline, and each glyph is 6 px wide including the gap.
+#define FW_VER_W ((int16_t)(6 * (sizeof(FW_VERSION) - 1)))
+
+// Right-aligns small text to xRight with its bottom on baseline y; returns
+// where it starts, so the next item can be placed to its left.
+static int16_t drawSmallRight(const char *s, int16_t xRight, int16_t y) {
+  const int16_t x = xRight - (int16_t)(6 * strlen(s) - 1);
+  display.setFont(NULL);
+  display.setTextSize(1);
+  display.setCursor(x, y - 7);
+  display.print(s);
+  display.setFont(&FreeSans9pt7b);      // restore for whatever draws next
+  return x;
+}
+
+// Header is shared by every frame: what this is, Vcap, the charge trend and the
+// boot counter. Laid out right to left. The trend is what the sleep gained - the
+// whole "is there enough light" readout. The marker carries the direction, so
+// the number is printed unsigned; a signed one next to the flat bar read as a
+// double minus.
 static void drawHeader(const Reading &r) {
-  char buf[32];
+  char buf[16];
+  const int16_t y = 15;
   display.setFont(&FreeSans9pt7b);
-  display.setCursor(4, 15);
+  display.setCursor(4, y);
   display.print("sensor satellite");
-  snprintf(buf, sizeof(buf), "%.2f V   #%lu", r.vcap, (unsigned long)bootCount);
-  drawRight(buf, display.width() - 4, 15);
+
+  snprintf(buf, sizeof(buf), "#%lu", (unsigned long)bootCount);
+  int16_t x = drawSmallRight(buf, display.width() - 4, y);
+  if (r.haveTrend) {
+    snprintf(buf, sizeof(buf), "%.0f mV", fabsf(r.dv * 1000.0f));
+    x = drawSmallRight(buf, x - 8, y);
+    x -= 14;
+    drawTrend(x, y, r.dv);
+  }
+  snprintf(buf, sizeof(buf), "%.2f V", r.vcap);
+  drawRight(buf, x - 6, y);
   display.drawFastHLine(0, 21, display.width(), GxEPD_BLACK);
 }
 
-// Firmware version, bottom right corner, half the height of the min/max line.
-// The built-in 5x7 font at size 1 is that half, and unlike every GFX font here
-// it is positioned by its TOP-left corner rather than its baseline.
-#define FW_VER_W ((int16_t)(6 * (sizeof(FW_VERSION) - 1)))
-
+// Firmware version, bottom right corner, in the same small print.
 static void drawVersion() {
   display.setFont(NULL);
   display.setTextSize(1);
   display.setCursor(display.width() - 2 - FW_VER_W, display.height() - 9);
   display.print(FW_VERSION);
   display.setFont(&FreeSans9pt7b);      // restore for whatever draws next
-}
-
-// Footer right: is the cap gaining or losing between wakes. This is the whole
-// "is there enough light" readout - mV per cycle, with the arrow for direction.
-// Right-aligned clear of the version, not to the panel edge.
-static void drawTrendFooter(const Reading &r) {
-  if (!r.haveTrend) return;
-  char buf[16];
-  int16_t bx, by; uint16_t bw, bh;
-  const int16_t y     = display.height() - 6;
-  const int16_t xEdge = display.width() - 6 - FW_VER_W;
-  snprintf(buf, sizeof(buf), "%+.0f mV", r.dv * 1000.0f);
-  display.getTextBounds(buf, 0, y, &bx, &by, &bw, &bh);
-  display.setCursor(xEdge - bw, y);
-  display.print(buf);
-  drawTrend(xEdge - bw - 15, y, r.dv);
 }
 
 static void drawFrame(bool ok, const Reading &r) {
@@ -675,7 +686,6 @@ static void drawFrame(bool ok, const Reading &r) {
   display.setCursor(4, H - 6);
   snprintf(buf, sizeof(buf), "min %.1f   max %.1f", tMin, tMax);
   display.print(buf);
-  drawTrendFooter(r);
   drawVersion();
 }
 
@@ -707,7 +717,6 @@ static void drawHoldFrame(const Reading &r) {
   display.setCursor(4, H - 6);
   snprintf(buf, sizeof(buf), "min %.1f   max %.1f", tMin, tMax);
   display.print(buf);
-  drawTrendFooter(r);
   drawVersion();
 }
 
@@ -804,7 +813,9 @@ static void parkPins() {
   // black, so no pin state here saves anything - only desoldering it does. A
   // pull-up would just source into its input, and holding it LOW is worse: the
   // hold survives the wake reset and GPIO8 must be high at boot. On the XIAO the
-  // pin carries nothing at all, and the same "leave it alone" applies.
+  // pin carries only an external 10k pull-up to 3V3, which draws nothing while
+  // the pad is high-Z - driving it LOW would cost ~330 uA, driving it HIGH saves
+  // nothing. The same "leave it alone" applies.
   //
   // An earlier comment here called it a blue LED with 206 uA of drive current,
   // from the 2026-09-03 shunt session that was later thrown out for a ground
