@@ -151,10 +151,14 @@ def main():
                 bad = ", ".join(f"CH{c}" for c, v in zip(chans, vs) if v is None)
                 print(f"# {t:.1f} no valid measurement on {bad} — check the channel "
                       f"is on and the trace is on screen", file=sys.stderr)
-            else:
-                row = [f"{t:.1f}"] + [f"{v:.4f}" for v in vs]
+            # A channel that is off screen leaves its field blank rather than
+            # dropping the row: two channels at different scales are often
+            # meant to cover different parts of the signal.
+            if not all(v is None for v in vs):
+                row = [f"{t:.2f}"] + ["" if v is None else f"{v:.6f}" for v in vs]
                 if args.shunt:
-                    row.append(f"{(vs[0] - vs[1]) / args.shunt * 1000:.3f}")
+                    row.append("" if None in vs[:2] else
+                               f"{(vs[0] - vs[1]) / args.shunt * 1000:.3f}")
                 print(",".join(row), flush=True)
                 if writer:
                     writer.writerow(row)
