@@ -179,9 +179,12 @@ gate decides from there:
 
 | Vcap | What happens |
 | ---- | ------------ |
-| ≥ `VCAP_RESUME` 3.80 V | normal cycling, every `CYCLE_S` |
-| < `VCAP_HOLD` 3.50 V | cycling stops; one "LOW POWER" frame, then `HOLD_S` polls |
-| < `VCAP_FLOOR` 3.25 V | hold without even drawing the frame — too close to brownout |
+| ≥ `v_resume`, default 3.80 V | normal cycling, every `cycle_s` (300 s) |
+| < `v_hold`, default 3.50 V | cycling stops; one "Low Power" frame, then polls every `poll_s` (900 s) |
+| < `v_floor`, default 3.25 V | hold without even drawing the frame — too close to brownout |
+
+All five are settings that can be changed over USB without reflashing - see
+*Settings, without reflashing* below.
 
 Why it is needed: 4 F is enormous next to this load, so a failed boot costs only
 **~1.5 mV**. A brownout reset therefore leaves Vcap where it was, the node
@@ -264,11 +267,49 @@ Serial up, and a flat cap is precisely when you most want the log.
 
 ```
 # BOOT held - console mode, this board will not sleep.
-# d = dump log, e = erase log, c = continue (cycle then sleep). Waiting 5 s...
+# d = dump log, e = erase log, p = settings, s <name> <value> = set,
+#   r = restore defaults, c = continue (cycle then sleep). Waiting 5 s...
 ```
 
 The prompt re-offers itself after each command, so dump, look, erase, dump again
 without resetting between.
+
+`tools/dump_log.py` does the dump for you and saves it under `data/<date>/`:
+start it, then plug USB in (jumper open) or tap RESET. Any byte opens the
+cold-boot window, so there is no timing to get right.
+
+#### Settings, without reflashing (v1.3)
+
+The thresholds and both sleep lengths are **settings**, stored in the NVS
+partition. They survive power loss and reflashing, and they are not part of the
+flash log. The `#define`s are only the defaults.
+
+| Name | Default | What |
+| ---- | ------- | ---- |
+| `cycle_s` | 300 | sleep between updates. Below 180 the node warns: the e-paper is not rated for refreshes that often |
+| `poll_s` | 900 | sleep between held-off polls |
+| `v_hold` | 3.50 | cycling stops below this |
+| `v_resume` | 3.80 | and restarts at this |
+| `v_floor` | 3.25 | below this, not even a hold frame |
+
+```
+python tools/node_cfg.py                          # show
+python tools/node_cfg.py cycle_s=180 poll_s=60    # change, then show
+python tools/node_cfg.py --defaults               # back to the #defines
+```
+
+Or by hand in the console: `p` shows them, `s v_hold 3.40` sets one, `r`
+restores the defaults. The node refuses anything that could strand it, and says
+why: it needs `v_floor < v_hold < v_resume`, all within 2.50-5.00 V,
+`cycle_s >= 60` and `poll_s >= 10`. A stored set that ever fails that check is
+ignored in favour of the defaults.
+
+They are read from flash on every cold boot and kept in RTC memory, so a timer
+wake pays nothing for them. A change takes effect at once: the console is always
+a cold boot.
+
+**The flash log does not record which thresholds were in force**, only each
+wake's `slept_s`. Note any change you make next to the dump you later read.
 
 There is also a **passive window on every cold boot**, if you would rather not
 touch BOOT: plug USB in with the jumper open (that is a power-on) and the sketch
@@ -326,11 +367,21 @@ catch. **Below 3.50 V, BOOT + RESET is the only way in**, and if the cap is abov
 `VCAP_FLOOR` the panel will be showing the LOW POWER frame, which is how you can
 tell from across the room which case you are in.
 
-Plugging USB in with the jumper open is also a power-on, and a cold boot always
-runs one full cycle regardless of the gate — a human pressing RESET or applying
-power gets a frame and a log line. So that gives a ~9 s window even on a weak
-cap. Do not lean on it repeatedly at low voltage: each press costs a full cycle
-plus, on the next timer wake, another hold frame — roughly 90 mV of the pack.
+Plugging USB in with the jumper open is also a power-on. Above `VCAP_FLOOR` a
+cold boot runs one full cycle regardless of the hysteresis, so a human pressing
+RESET or applying power gets a frame and a log line - a ~9 s window even on a
+weak cap. Do not lean on it repeatedly at low voltage: each press costs a full
+cycle plus, on the next timer wake, another hold frame - roughly 90 mV of the
+pack.
+
+**Below `VCAP_FLOOR` a cold boot sleeps at once - unless a USB host is there.**
+The divider is on the cap side of the jumper, so on USB it still reads the cap.
+Up to v1.1 that meant a USB plug-in with a flat cap slept before `Serial` came
+up and then held forever: no port, no frame, a board that looked dead on USB
+(2026-10-03). From v1.2 a cold boot first looks for USB SOF packets for up to
+0.5 s and skips both gates if it finds them; a power bank sends none and does
+not count. Only cold boots check, so USB plugged into a board that is already
+asleep and holding needs a RESET.
 
 Either way, **reflashing wipes RTC memory** — `bootCount` returns to 0,
 `tMin`/`tMax` reset, the hold latch clears, and `vcapPrev` is gone so the first

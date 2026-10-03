@@ -17,14 +17,17 @@
 #include <esp_sleep.h>
 #include <driver/gpio.h>
 #include <esp_partition.h>
+#include <Preferences.h>
 
 // ---------------- config ----------------
 #define PANEL_V2        1      // 1 = Waveshare 2.9" V2 (SSD1680, "V2" on the back)
                                // 0 = original V1 (IL3820)
 #define USE_DEEP_SLEEP  1      // 1 = sleep between cycles; drops the USB serial port
 #define CYCLE_S         300    // seconds between refreshes - keep >= 180 for e-paper
+                               // DEFAULT only: the live value is cfg.cycleS, which
+                               // the serial console can change - see "settings"
 #define LOG_S           2      // serial log interval when not deep sleeping
-#define FW_VERSION      "v1.1" // shown small, bottom right of every frame. Bump it
+#define FW_VERSION      "v1.3" // shown small, bottom right of every frame. Bump it
                                // when reflashing, so a panel photograph says
                                // which build produced it.
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
@@ -153,6 +156,8 @@
 // costs ~70 mV of the 4 F pack - 9.1 s awake, most of it the 4.3 s refresh. A
 // held-off wake costs ~3 mV, because it reads the divider and goes straight
 // back to sleep without touching Serial, SPI or the panel.
+// These four are DEFAULTS. The live values are in cfg, below, and the serial
+// console changes them without a reflash.
 #define VCAP_HOLD    3.50f // cycling stops below this
 #define VCAP_RESUME  3.80f // and does not restart until this - the hysteresis
 #define VCAP_FLOOR   3.25f // below this, do not even spend a refresh saying so
@@ -186,6 +191,30 @@ RTC_DATA_ATTR uint16_t vSleepPrevMv = 0;   // Vcap at the previous sleep
 RTC_DATA_ATTR uint32_t pendSeq      = 0;   // nonzero = a cycle is in flight
 RTC_DATA_ATTR uint16_t pendVbootMv  = 0;   // ...and the Vcap it started from
 RTC_DATA_ATTR uint8_t  pendFlags    = 0;
+
+// ---------------- settings ----------------
+// The power thresholds and both sleep lengths, changeable over the serial
+// console without reflashing. Stored in the NVS partition (not the log's
+// `spiffs` one), so they survive power loss and reflashing alike; only an
+// `--erase-all` or the console's `r` brings back the #define defaults above.
+//
+// Read from flash on every cold boot and cached in RTC memory, so a timer wake
+// - the hot path, and the held-off poll above all - pays nothing for them. A
+// change made in the console is a cold boot by definition, so the cache is
+// always current.
+#define CFG_MAGIC  0x43464731UL      // "CFG1"; bump if the struct changes
+struct Config {
+  uint32_t magic;
+  uint16_t cycleS;     // sleep between updates
+  uint16_t holdS;      // sleep between held-off polls
+  float    vHold;      // cycling stops below this
+  float    vResume;    // and restarts at this
+  float    vFloor;     // below this, not even a hold frame
+};
+RTC_DATA_ATTR Config cfg = {0, 0, 0, 0, 0, 0};
+
+static const Config CFG_DEFAULT = {CFG_MAGIC, CYCLE_S, HOLD_S,
+                                   VCAP_HOLD, VCAP_RESUME, VCAP_FLOOR};
 
 static int8_t  sdaPin = -1, sclPin = -1;
 static uint8_t bmeAddr = 0;
@@ -243,6 +272,40 @@ static_assert(sizeof(LogRec) == LOG_SLOT, "LogRec must stay one slot");
 static LogRec gRec;                  // filled through the wake, written at sleep
 static const esp_partition_t *gPart = nullptr;
 
+
+// ---------------- settings, continued ----------------
+// Defined down here, after every type the sketch declares: the Arduino
+// preprocessor puts its generated prototypes ahead of the first function.
+// Returns why a config is unusable, or nullptr. Every stored config passes
+// through here, so a corrupt or hand-typed value can never strand the node:
+// the worst it gets is the defaults.
+static const char *cfgProblem(const Config &c) {
+  if (c.magic != CFG_MAGIC)                     return "bad magic";
+  if (c.cycleS < 60)                            return "cycle_s below 60";
+  if (c.holdS  < 10)                            return "poll_s below 10";
+  if (!(c.vFloor >= 2.50f && c.vResume <= 5.00f)) return "voltages outside 2.50-5.00";
+  if (!(c.vFloor < c.vHold && c.vHold < c.vResume))
+    return "need v_floor < v_hold < v_resume";
+  return nullptr;
+}
+
+static void cfgLoad() {
+  Config c = {};
+  Preferences prefs;
+  if (prefs.begin("sat", true)) {           // read-only; false if never written
+    if (prefs.getBytes("cfg", &c, sizeof c) != sizeof c) c.magic = 0;
+    prefs.end();
+  }
+  cfg = cfgProblem(c) ? CFG_DEFAULT : c;
+}
+
+static bool cfgSave(const Config &c) {
+  Preferences prefs;
+  if (!prefs.begin("sat", false)) return false;
+  const bool ok = prefs.putBytes("cfg", &c, sizeof c) == sizeof c;
+  prefs.end();
+  return ok;
+}
 
 // ---------------- logging ----------------
 // Everything goes to both ports. Cheap insurance: a line that only reaches USB
@@ -361,7 +424,7 @@ static void logFlashStatus() {
   const uint32_t n = logSlots();
   logBoth("# flash log: %s, %lu/%lu slots, ~%lu days left at %d s\n",
                 pt->label, (unsigned long)logHead, (unsigned long)n,
-                (unsigned long)((n - logHead) / (86400UL / CYCLE_S)), CYCLE_S);
+                (unsigned long)((n - logHead) / (86400UL / cfg.cycleS)), cfg.cycleS);
 }
 
 // CSV to whichever port is listening. dv_sleep is what the sleep gained - the
@@ -427,17 +490,71 @@ static bool hostPresent() {
   return false;
 }
 
+static void cfgPrint() {
+  logBoth("# settings (flash):  cycle_s %u  poll_s %u  v_hold %.2f  v_resume %.2f"
+          "  v_floor %.2f\n", cfg.cycleS, cfg.holdS, cfg.vHold, cfg.vResume, cfg.vFloor);
+  logBoth("# defaults:          cycle_s %u  poll_s %u  v_hold %.2f  v_resume %.2f"
+          "  v_floor %.2f\n", CYCLE_S, HOLD_S, VCAP_HOLD, VCAP_RESUME, VCAP_FLOOR);
+}
+
+// The rest of an "s <name> <value>" line, typed after the 's'. Echoes, so a
+// terminal without local echo still shows what was typed.
+static bool readLine(char *buf, size_t len, uint32_t timeoutMs) {
+  size_t n = 0;
+  const uint32_t until = millis() + timeoutMs;
+  while ((int32_t)(millis() - until) < 0) {
+    if (!Serial.available()) { delay(5); continue; }
+    const int c = Serial.read();
+    if (c == '\r' || c == '\n') { buf[n] = 0; logBoth("\n"); return true; }
+    if (n + 1 < len) { buf[n++] = (char)c; Serial.write((char)c); }
+  }
+  buf[n] = 0;
+  return false;
+}
+
+static void cfgSet() {
+  char line[48];
+  if (!readLine(line, sizeof line, 20000)) { logBoth("\n# set: timed out\n"); return; }
+  char name[16];
+  float v;
+  if (sscanf(line, " %15s %f", name, &v) != 2) {
+    logBoth("# set: use  s <name> <value>   names: cycle_s poll_s v_hold v_resume v_floor\n");
+    return;
+  }
+  Config c = cfg;
+  if      (!strcmp(name, "cycle_s"))  c.cycleS  = (uint16_t)constrain(v, 0, 65535);
+  else if (!strcmp(name, "poll_s"))   c.holdS   = (uint16_t)constrain(v, 0, 65535);
+  else if (!strcmp(name, "v_hold"))   c.vHold   = v;
+  else if (!strcmp(name, "v_resume")) c.vResume = v;
+  else if (!strcmp(name, "v_floor"))  c.vFloor  = v;
+  else { logBoth("# set: unknown name '%s'\n", name); return; }
+  if (const char *why = cfgProblem(c)) { logBoth("# set: refused - %s\n", why); return; }
+  if (!cfgSave(c)) { logBoth("# set: FLASH WRITE FAILED, nothing changed\n"); return; }
+  cfg = c;
+  if (cfg.cycleS < 180)
+    logBoth("# note: cycle_s below 180 refreshes the e-paper more often than it is rated for\n");
+  cfgPrint();
+}
+
 // Returns true if it did something, so the caller can offer the window again -
 // dump, look, erase, dump again, without a reset between each.
 static bool serveCommands() {
-  logBoth("# d = dump log, e = erase log, c = continue (cycle then sleep)."
-          " Waiting 5 s...\n");
+  logBoth("# d = dump log, e = erase log, p = settings, s <name> <value> = set,"
+          " r = restore defaults, c = continue (cycle then sleep). Waiting 5 s...\n");
   const uint32_t until = millis() + 5000;
   while ((int32_t)(millis() - until) < 0) {
     if (!Serial.available()) { delay(20); continue; }
     const int c = Serial.read();
     if (c == 'd') { logDump();  return true; }
     if (c == 'e') { logErase(); return true; }
+    if (c == 'p') { cfgPrint(); return true; }
+    if (c == 's') { Serial.write('s'); cfgSet(); return true; }
+    if (c == 'r') {
+      if (cfgSave(CFG_DEFAULT)) { cfg = CFG_DEFAULT; logBoth("# defaults restored\n"); }
+      else                      logBoth("# FLASH WRITE FAILED\n");
+      cfgPrint();
+      return true;
+    }
     if (c == 'c') return false;
   }
   logBoth("# no command, continuing\n");
@@ -452,6 +569,7 @@ static void consoleMode(const Reading &sense) {
   logBoth("\n# BOOT held - console mode, this board will not sleep.\n");
   logBoth("# Vcap %.3f V, boot #%lu\n", sense.vcap, (unsigned long)bootCount);
   logFlashStatus();
+  cfgPrint();
   logBoth("# release BOOT now; press RESET to leave console mode.\n");
   for (;;) {
     serveCommands();
@@ -694,28 +812,17 @@ static void drawFrame(bool ok, const Reading &r) {
 // sculpture explains its own silence for as long as the silence lasts.
 static void drawHoldFrame(const Reading &r) {
   char buf[40];
-  const int16_t H = display.height();
   display.fillScreen(GxEPD_WHITE);
   display.setTextColor(GxEPD_BLACK);
   drawHeader(r);
 
   display.setFont(&FreeSansBold9pt7b);
-  display.setCursor(4, 48);
-  display.print("LOW POWER - waiting for light");
+  display.setCursor(4, 60);
+  display.print("Low Power - waiting for light");
 
   display.setFont(&FreeSans9pt7b);
-  display.setCursor(4, 72);
-  snprintf(buf, sizeof(buf), "cycling stops below %.2f V", VCAP_HOLD);
-  display.print(buf);
-  display.setCursor(4, 92);
-  snprintf(buf, sizeof(buf), "resumes at %.2f V, checked every %d min",
-           VCAP_RESUME, HOLD_S / 60);
-  display.print(buf);
-
-  display.drawFastHLine(0, H - 22, display.width(), GxEPD_BLACK);
-  display.setFont(&FreeSans9pt7b);
-  display.setCursor(4, H - 6);
-  snprintf(buf, sizeof(buf), "min %.1f   max %.1f", tMin, tMax);
+  display.setCursor(4, 86);
+  snprintf(buf, sizeof(buf), "cycling resumes at %.2f V", cfg.vResume);
   display.print(buf);
   drawVersion();
 }
@@ -871,6 +978,12 @@ static void sleepFor(uint32_t seconds) {
 void setup() {
   unparkPins();
 
+  // Settings from flash on a cold boot; a timer wake trusts the RTC copy. The
+  // magic check also catches an RTC that came up blank for any other reason.
+  if (cfg.magic != CFG_MAGIC ||
+      esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_TIMER)
+    cfgLoad();
+
   // Vcap before anything else is powered up. A held-off wake has to be cheap to
   // be worth making, and everything below this line - Serial, I2C, SPI, the
   // panel - is what makes a wake expensive. Reading the divider needs none of
@@ -913,6 +1026,22 @@ void setup() {
   if (coldBoot) holding = false;
   if (coldBoot) gRec.flags |= LF_COLD;
 
+  // USB host on the other end - the board is running off USB, not the cap, so
+  // there is nothing to protect and the gates below must not fire. Without this
+  // a USB plug-in with the cap low reads Vcap through the divider, which is on
+  // the cap side of the jumper, sleeps at the floor before Serial is up, and
+  // then holds forever: no port, no frame, a board that looks dead on USB.
+  // 2026-10-03. Detected by SOF packets, so a USB power bank does not count.
+  // Cold boots only - the host takes ~100 ms to start sending SOFs, which a
+  // timer wake should not pay.
+  bool usbHost = false;
+  if (coldBoot) {
+    for (int i = 0; i < 50 && !usbHost; i++) {   // up to ~500 ms
+      usbHost = HWCDC::isPlugged();
+      if (!usbHost) delay(10);
+    }
+  }
+
   // An attempt was in flight when the lights went out. Record it before doing
   // anything else, because this is the datum the whole log exists for: a boot
   // voltage that was not enough to finish an update.
@@ -941,11 +1070,11 @@ void setup() {
   // costs ~20 mV, which is exactly what a cap this low cannot spare - and it
   // catches the repeated-brownout case, where every reset looks like a cold
   // boot and would otherwise buy another full cycle.
-  if (sense.vcap < VCAP_FLOOR) {
+  if (sense.vcap < cfg.vFloor && !usbHost) {
     holding      = true;
     holdPolls++;
     gRec.flags  |= LF_HELD;
-    sleepFor(HOLD_S);          // logs on the way out, like every other exit
+    sleepFor(cfg.holdS);       // logs on the way out, like every other exit
   }
 
   // Hysteresis. Held off, it takes VCAP_RESUME to start cycling again; running,
@@ -954,13 +1083,13 @@ void setup() {
   bool enterHold = false;
   if (!coldBoot) {
     if (holding) {
-      if (sense.vcap < VCAP_RESUME) {
+      if (sense.vcap < cfg.vResume) {
         holdPolls++;
         gRec.flags |= LF_HELD;
-        sleepFor(HOLD_S);      // still waiting - cheapest possible wake
+        sleepFor(cfg.holdS);   // still waiting - cheapest possible wake
       }
       holding = false;         // recovered
-    } else if (sense.vcap < VCAP_HOLD) {
+    } else if (sense.vcap < cfg.vHold) {
       holding   = true;
       enterHold = true;        // say so on the panel once, then hold
     }
@@ -978,6 +1107,7 @@ void setup() {
   delay(300);                  // let USB-CDC enumerate before the first print
   logBoth("\n# proto_epaper_esp32c3 " FW_VERSION "  boot #%lu\n",
                 (unsigned long)bootCount);
+  cfgPrint();
   logBoth("# radios never initialised - WiFi and BLE PHY unpowered\n");
   mark("serial up");
 
@@ -1014,7 +1144,7 @@ void setup() {
                   netCurrentUA(sense));
   logBoth("# hold gate: %.2f V, stop < %.2f, resume >= %.2f, floor %.2f, "
           "%lu polls held\n",
-                sense.vcap, VCAP_HOLD, VCAP_RESUME, VCAP_FLOOR,
+                sense.vcap, cfg.vHold, cfg.vResume, cfg.vFloor,
                 (unsigned long)holdPolls);
   logFlashStatus();
 
@@ -1024,11 +1154,11 @@ void setup() {
 
   if (enterHold) {
     logBoth("# below %.2f V - one frame, then holding, %d s per poll\n",
-                  VCAP_HOLD, HOLD_S);
+                  cfg.vHold, cfg.holdS);
     gRec.flags |= LF_HELD | LF_HOLDFRAME;
     refresh(FRAME_HOLD, sense);
     Serial.flush();
-    sleepFor(HOLD_S);
+    sleepFor(cfg.holdS);
   }
   holdPolls = 0;
 #endif
@@ -1044,7 +1174,7 @@ void setup() {
 
   mark("runCycle enter");
   runCycle(sense);
-  logBoth("# sleeping %d s\n", CYCLE_S);
+  logBoth("# sleeping %u s\n", cfg.cycleS);
   Serial.flush();
 #if USE_LOG_MIRROR
   Serial0.flush();
@@ -1054,7 +1184,7 @@ void setup() {
   // and RTS deasserted, so each read is a cold boot. Check the counter on the
   // panel instead. Measured 2026-09-25.
 
-  sleepFor(CYCLE_S);
+  sleepFor(cfg.cycleS);
 #endif
 }
 
@@ -1067,8 +1197,8 @@ void loop() {
   sense.haveTrend = (vcapPrev > 0.1f);
   sense.dv        = sense.haveTrend ? sense.vcap - vcapPrev : 0.0f;
   vcapPrev        = sense.vcap;
-  sleptS          = CYCLE_S;
+  sleptS          = cfg.cycleS;
   runCycle(sense);
-  delay((uint32_t)CYCLE_S * 1000UL);
+  delay((uint32_t)cfg.cycleS * 1000UL);
 #endif
 }
