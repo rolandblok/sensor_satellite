@@ -26,9 +26,13 @@ That is a sixteenth of the 400 uA. **The XIAO's own power path is not the
 problem, and an HT7533 cannot buy more than those ~25 uA.** The HT7533 is not
 being tested further.
 
-**Part 2, the integrated sculpture: next.** The missing ~375 uA is somewhere
-on the sculpture, or in its cap. Part 2 measures it there with no soldering:
-the VCAP jumper is the break point. It measures the wake as well as the sleep.
+**Part 2, the integrated sculpture: started 2026-10-03.** First look: the
+sculpture sleeps at **~0.9 mA** on the lab supply at 4.5 V, against 25 uA for
+the bare board, with the charge LED confirmed removed. The extra current is the
+BME280 breakout or the e-paper module. See *Where this left off* at the end.
+
+Part 2 measures the sculpture with no soldering: the VCAP jumper is the break
+point, and it captures the wake as well as the sleep.
 
 ## Contents
 
@@ -205,7 +209,7 @@ Those millivolts are the flash log's units, so they compare directly with the
 | ID | Setup | Expect | Why | Result / conclusion |
 | -- | ----- | ------ | --- | ------------------- |
 | **S1** | pin V, 4.00 V, XIAO off, panels covered, 1-2 h | charging current decaying to a floor | the real cap's leakage, at night voltage, in place | |
-| **S2** | pin X, 4.50 V, cap at ~4.0 V from S1, 20 min | ~260 mC per wake; sleep somewhere between 25 and 400 uA | the sculpture's wake cost and sleep current, directly | |
+| **S2** | pin X, 4.50 V, cap at ~4.0 V from S1, 20 min | ~260 mC per wake; sleep somewhere between 25 and 400 uA | the sculpture's wake cost and sleep current, directly | **First look, 2026-10-03 - not yet zeroed:** sleep **~0.87-0.93 mA** (CH2 9.15-9.74 mV, earlier no-current reading 0.34 mV). Wake ~15 s at **~21 mA** - CH1's probe turned out to be on 10x, so its readings are x10. Cap at 3.83 V, so this was normal cycling (`cycle_s` 60), not the hold state. **That is ~40x the bare board and ~2x the night's 400 uA.** Charge LED confirmed desoldered on the sculpture, so it is the BME280 breakout or the e-paper module. S1 skipped. `S2_first_look3.csv`, `S2_4V5.csv` (80 s, interrupted). `S2_first_look.csv` / `2` were taken with CH2 unconnected - ignore their CH2 |
 | **S3** | as S2, firmware holding the e-paper lines through sleep | | are the panel's floating inputs the extra sleep current? | only if S2's sleep is far above 25 uA |
 
 **Reading the results:**
@@ -235,3 +239,34 @@ takes it from 4.0 to ~3.4 V (time constant 400 s; watch it with the DMM). Then
 reconnect the supply on pin X. The cold boot runs one cycle, and the next wake
 draws the hold frame and holds. Expect the same sleep current as S2. Run this
 only if S2's sleep looks odd.
+
+## Where this left off - 2026-10-03, evening
+
+**Sculpture state, as left:**
+
+* firmware **v1.3**, settings `cycle_s` **60** (the other four at defaults), flash
+  log **erased** at ~19:00, so it now holds only this session's wakes
+* jumper cap **off**; lab supply + on pin X at 4.5 V, − through the 10.1 ohm
+  shunt to the frame; **1N5817 removed**; panels covered; cap at ~3.83 V
+* scope: CH1 100 mV/div offset -300 mV, CH2 2 mV/div offset -6 mV, both 1x in
+  the scope, 50 ms/div, average. **The CH1 probe's switch is on 10x** - set it
+  to 1x, or read CH1 as x10
+
+**Measured so far:** sleep ~0.9 mA, wake ~15 s at ~21 mA (see S2 above). Not
+zeroed with the wire, which is fine at this size: the zero is worth ~30 uA.
+
+**Next, in order:**
+
+1. **CH1 probe to 1x**, then a clean 5 min log at 4.5 V:
+   `python tools/scope_log.py --ip 192.168.94.12 --channel 1,2 --interval 0.25 --duration 300 --out sleep_current/data/<date>/S2_4V5.csv`
+   and `analyze.py cycle ... --ohms 10.1 --wake-offset-mv <CH1 zero> --offset-mv 0.34`.
+2. **The same at 3.8 V supply.** Does the ~0.9 mA depend on supply voltage? The
+   night's 400 uA was at 3.4-2.8 V.
+3. **S3, the e-paper lines held through sleep** - firmware only. If the sleep
+   current falls back towards ~25 uA, the e-paper's floating inputs were it.
+4. If S3 does not help: the BME280 breakout (purple, 4-pin - likely has its own
+   regulator and level shifters) is the remaining suspect. Separating it without
+   soldering needs a firmware trick, e.g. not parking SDA/SCL, or an S3-style
+   variant for the I2C lines.
+5. Before normal running again: `python tools/node_cfg.py cycle_s=300`, jumper
+   cap back on, USB off.
