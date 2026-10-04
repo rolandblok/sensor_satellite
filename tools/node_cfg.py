@@ -6,7 +6,8 @@
     python tools/node_cfg.py --erase                  # erase the flash log
 
 Names: cycle_s (sleep between updates), poll_s (sleep between held-off polls),
-v_hold, v_resume, v_floor (volts). The node refuses anything that would strand
+v_hold, v_resume, v_floor (volts), park_epd (0/1: hold the e-paper's control
+lines through sleep, v1.4+). The node refuses anything that would strand
 it - v_floor < v_hold < v_resume, all within 2.50-5.00 V, cycle_s >= 60,
 poll_s >= 10 - and says why.
 
@@ -22,7 +23,7 @@ try:
 except ImportError:
     sys.exit("pyserial not installed:  python -m pip install pyserial")
 
-NAMES = ("cycle_s", "poll_s", "v_hold", "v_resume", "v_floor")
+NAMES = ("cycle_s", "poll_s", "v_hold", "v_resume", "v_floor", "park_epd")
 
 
 def find_port():
@@ -59,6 +60,8 @@ def main():
                     help="erase the flash log - dump it first with tools/dump_log.py")
     ap.add_argument("--port")
     ap.add_argument("--wait", type=float, default=300)
+    ap.add_argument("--answer", type=float, default=30,
+                    help="seconds to keep poking for the command window")
     a = ap.parse_args()
 
     pairs = []
@@ -80,21 +83,32 @@ def main():
     s = serial.Serial()
     s.port, s.baudrate, s.timeout = port, 115200, 0.1
     s.dtr = s.rts = False
-    for _ in range(50):
-        try:
-            s.open()
-            break
-        except serial.SerialException:
-            time.sleep(0.1)
-    else:
-        sys.exit(f"# could not open {port}")
+
+    def reopen():
+        for _ in range(100):     # up to ~10 s for the node to re-enumerate
+            try:
+                s.close()
+                s.port = find_port() or s.port
+                s.open()
+                return
+            except serial.SerialException:
+                time.sleep(0.1)
+        sys.exit(f"# could not open {s.port}")
+    reopen()
 
     # Any byte opens the cold-boot command window; keep poking until it answers.
-    t_end = time.time() + 30
+    # Opening the port can itself reset the C3 (even with DTR/RTS low), and the
+    # port vanishes and comes back under us - so a dead port means reopen, not
+    # give up.
+    t_end = time.time() + a.answer
     shown = None
     while time.time() < t_end and not shown:
-        s.write(b"p")
-        shown = read_until(s, ["# settings (flash)"], 0.3)
+        try:
+            s.write(b"p")
+            shown = read_until(s, ["# settings (flash)"], 0.3)
+        except serial.SerialException:
+            time.sleep(0.3)
+            reopen()
     if not shown:
         sys.exit("# no answer - is it v1.3 or later? Or try console mode: tap RESET, then hold BOOT")
     read_until(s, ["# defaults"], 2)

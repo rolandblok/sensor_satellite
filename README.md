@@ -291,6 +291,7 @@ flash log. The `#define`s are only the defaults.
 | `v_hold` | 3.50 | cycling stops below this |
 | `v_resume` | 3.80 | and restarts at this |
 | `v_floor` | 3.25 | below this, not even a hold frame |
+| `park_epd` | 0 | 1 = hold the e-paper's RST/CS high and SCK/MOSI/DC low through sleep, instead of letting them float (v1.4). The S3 test in `sleep_current/` |
 
 ```
 python tools/node_cfg.py                          # show

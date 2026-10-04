@@ -27,7 +27,7 @@
                                // DEFAULT only: the live value is cfg.cycleS, which
                                // the serial console can change - see "settings"
 #define LOG_S           2      // serial log interval when not deep sleeping
-#define FW_VERSION      "v1.3" // shown small, bottom right of every frame. Bump it
+#define FW_VERSION      "v1.4" // shown small, bottom right of every frame. Bump it
                                // when reflashing, so a panel photograph says
                                // which build produced it.
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
@@ -162,6 +162,9 @@
 #define VCAP_RESUME  3.80f // and does not restart until this - the hysteresis
 #define VCAP_FLOOR   3.25f // below this, do not even spend a refresh saying so
 #define HOLD_S       900   // poll interval while held off
+#define PARK_EPD     0     // 1 = hold the e-paper's control lines through sleep.
+                           // A setting (park_epd), so it can be A/B tested
+                           // without reflashing - see parkPins()
 #define TREND_MV     20.0f // trend deadband; boot-to-boot ADC spread is +-15 mV
 
 #if PANEL_V2
@@ -202,7 +205,8 @@ RTC_DATA_ATTR uint8_t  pendFlags    = 0;
 // - the hot path, and the held-off poll above all - pays nothing for them. A
 // change made in the console is a cold boot by definition, so the cache is
 // always current.
-#define CFG_MAGIC  0x43464731UL      // "CFG1"; bump if the struct changes
+#define CFG_MAGIC  0x43464732UL      // "CFG2"; bump if the struct changes
+#define CFG1_MAGIC 0x43464731UL      // v1.3's layout, migrated on load
 struct Config {
   uint32_t magic;
   uint16_t cycleS;     // sleep between updates
@@ -210,11 +214,16 @@ struct Config {
   float    vHold;      // cycling stops below this
   float    vResume;    // and restarts at this
   float    vFloor;     // below this, not even a hold frame
+  uint8_t  parkEpd;    // 1 = hold the e-paper lines through sleep
+  uint8_t  spare[3];
 };
-RTC_DATA_ATTR Config cfg = {0, 0, 0, 0, 0, 0};
+RTC_DATA_ATTR Config cfg = {};
 
 static const Config CFG_DEFAULT = {CFG_MAGIC, CYCLE_S, HOLD_S,
-                                   VCAP_HOLD, VCAP_RESUME, VCAP_FLOOR};
+                                   VCAP_HOLD, VCAP_RESUME, VCAP_FLOOR,
+                                   PARK_EPD, {0, 0, 0}};
+#define CFG1_SIZE 20   // v1.3's Config: magic, two uint16, three floats
+static_assert(sizeof(Config) == 24, "Config layout changed - bump CFG_MAGIC");
 
 static int8_t  sdaPin = -1, sclPin = -1;
 static uint8_t bmeAddr = 0;
@@ -283,6 +292,7 @@ static const char *cfgProblem(const Config &c) {
   if (c.magic != CFG_MAGIC)                     return "bad magic";
   if (c.cycleS < 60)                            return "cycle_s below 60";
   if (c.holdS  < 10)                            return "poll_s below 10";
+  if (c.parkEpd > 1)                            return "park_epd must be 0 or 1";
   if (!(c.vFloor >= 2.50f && c.vResume <= 5.00f)) return "voltages outside 2.50-5.00";
   if (!(c.vFloor < c.vHold && c.vHold < c.vResume))
     return "need v_floor < v_hold < v_resume";
@@ -293,7 +303,19 @@ static void cfgLoad() {
   Config c = {};
   Preferences prefs;
   if (prefs.begin("sat", true)) {           // read-only; false if never written
-    if (prefs.getBytes("cfg", &c, sizeof c) != sizeof c) c.magic = 0;
+    const size_t n = prefs.getBytesLength("cfg");
+    if (n == sizeof c) {
+      if (prefs.getBytes("cfg", &c, sizeof c) != sizeof c) c.magic = 0;
+    } else if (n == CFG1_SIZE) {
+      // v1.3 stored the same fields minus park_epd: keep them, so a reflash
+      // does not quietly undo settings made for a measurement session.
+      if (prefs.getBytes("cfg", &c, CFG1_SIZE) == CFG1_SIZE && c.magic == CFG1_MAGIC) {
+        c.magic   = CFG_MAGIC;
+        c.parkEpd = PARK_EPD;
+      } else {
+        c.magic = 0;
+      }
+    }
     prefs.end();
   }
   cfg = cfgProblem(c) ? CFG_DEFAULT : c;
@@ -492,9 +514,11 @@ static bool hostPresent() {
 
 static void cfgPrint() {
   logBoth("# settings (flash):  cycle_s %u  poll_s %u  v_hold %.2f  v_resume %.2f"
-          "  v_floor %.2f\n", cfg.cycleS, cfg.holdS, cfg.vHold, cfg.vResume, cfg.vFloor);
+          "  v_floor %.2f  park_epd %u\n", cfg.cycleS, cfg.holdS, cfg.vHold,
+          cfg.vResume, cfg.vFloor, cfg.parkEpd);
   logBoth("# defaults:          cycle_s %u  poll_s %u  v_hold %.2f  v_resume %.2f"
-          "  v_floor %.2f\n", CYCLE_S, HOLD_S, VCAP_HOLD, VCAP_RESUME, VCAP_FLOOR);
+          "  v_floor %.2f  park_epd %u\n", CYCLE_S, HOLD_S, VCAP_HOLD, VCAP_RESUME,
+          VCAP_FLOOR, PARK_EPD);
 }
 
 // The rest of an "s <name> <value>" line, typed after the 's'. Echoes, so a
@@ -518,7 +542,7 @@ static void cfgSet() {
   char name[16];
   float v;
   if (sscanf(line, " %15s %f", name, &v) != 2) {
-    logBoth("# set: use  s <name> <value>   names: cycle_s poll_s v_hold v_resume v_floor\n");
+    logBoth("# set: use  s <name> <value>   names: cycle_s poll_s v_hold v_resume v_floor park_epd\n");
     return;
   }
   Config c = cfg;
@@ -527,6 +551,7 @@ static void cfgSet() {
   else if (!strcmp(name, "v_hold"))   c.vHold   = v;
   else if (!strcmp(name, "v_resume")) c.vResume = v;
   else if (!strcmp(name, "v_floor"))  c.vFloor  = v;
+  else if (!strcmp(name, "park_epd")) c.parkEpd = (uint8_t)constrain(v, 0, 255);
   else { logBoth("# set: unknown name '%s'\n", name); return; }
   if (const char *why = cfgProblem(c)) { logBoth("# set: refused - %s\n", why); return; }
   if (!cfgSave(c)) { logBoth("# set: FLASH WRITE FAILED, nothing changed\n"); return; }
@@ -902,7 +927,12 @@ static void unparkPins() {
 #if EPD_BUSY >= 0
                              (gpio_num_t)EPD_BUSY,
 #endif
-                             (gpio_num_t)10};   // ex-BUSY, free but may hold a latch
+                             (gpio_num_t)10,    // ex-BUSY, free but may hold a latch
+                             // the e-paper lines, released whatever park_epd
+                             // says now - it may have said 1 at the last sleep
+                             (gpio_num_t)EPD_SCK, (gpio_num_t)EPD_RST,
+                             (gpio_num_t)EPD_MOSI, (gpio_num_t)EPD_CS,
+                             (gpio_num_t)EPD_DC};
   for (gpio_num_t p : held) gpio_hold_dis(p);
   gpio_deep_sleep_hold_dis();
 #endif
@@ -950,6 +980,25 @@ static void parkPins() {
 #else
   gpio_hold_en((gpio_num_t)10);
 #endif
+
+  // The e-paper's control lines, when park_epd is 1. Without this they go
+  // high-Z the moment the C3 sleeps, and the panel's CMOS inputs float. That
+  // can cost current in its input stages, and a RST drifting low resets the
+  // controller out of hibernate into its far hungrier standby. Pulls rather
+  // than driven levels: they cannot fight anything, and ~45k is plenty for
+  // inputs that draw nothing. Idle levels: RST and CS high (not reset, not
+  // selected), SCK low (SPI mode 0), MOSI and DC low.
+  // Measured as the S3 test in sleep_current/README.md.
+  if (cfg.parkEpd) {
+    const struct { uint8_t pin; uint8_t mode; } epd[] = {
+      {EPD_RST, INPUT_PULLUP}, {EPD_CS, INPUT_PULLUP},
+      {EPD_SCK, INPUT_PULLDOWN}, {EPD_MOSI, INPUT_PULLDOWN},
+      {EPD_DC, INPUT_PULLDOWN}};
+    for (const auto &e : epd) {
+      pinMode(e.pin, e.mode);
+      gpio_hold_en((gpio_num_t)e.pin);
+    }
+  }
   gpio_deep_sleep_hold_en();
 #endif
 }
