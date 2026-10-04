@@ -229,6 +229,7 @@ Those millivolts are the flash log's units, so they compare directly with the
 | **P2** | `sleep_probe` v2: e-paper lines rotated through untouched / RST+CS up / all down | | does a floating or low RST cost current? | **~860 / ~1020 / ~930 uA**, each twice, identical. RST held low costs nothing; pulling it up costs ~160 uA more. **The e-paper lines are worth ~0.1 mA at most.** Baseline back at ~860 uA, not P1's 340 - something switches between two levels. `P2_epd_states_4V5.csv` |
 | **P3** | `sleep_probe` v3: BME280 commanded to sleep; then also e-paper reset + deep sleep command, RST held high | a drop to ~25-50 uA in the phase that hits the culprit | find which part is awake | **No phase drops below ~860 uA** (all sleeps 860-964 uA). Either the commands did not take, or the ~0.86 mA is not a chip left awake but something static: a module's own regulator or level shifter, the sculpture's XIAO itself (part 1 measured a *different* XIAO), or a leakage path in the wiring. `P3_cmd_sleep_4V5.csv` |
 | **U1** | BME280 **VCC wire only** unsoldered; SDA, SCL, GND still connected. `sleep_probe` v3 | ~25-50 uA if the BME280 was the load | is it the BME280? | **2026-10-04: not lower - ~1.4 mA rising to ~1.8 mA over 2 min** (CH2 15.1 -> 18.9 mV at 5 mV/div, offset -15 mV; no zero taken at that setting yet, so +-0.1 mA). Wakes normal, every ~31.5 s. **Not clean:** with only VCC off, the BME280 is back-powered through SDA/SCL, which the C3 holds high with its pull-ups during sleep - that can draw odd, drifting current. SDA and SCL must come off too, or the whole breakout. `U1_no_bme.csv` (2 mV/div, partly clipped), `U1_no_bme_5mVdiv.csv` |
+| **U2** | BME280 VCC soldered back (its GND may have been a poor joint; reflowed). DMM: SDA and SCL read high at the BME280 during sleep | | did the poor GND or the loose VCC cause it? | **2026-10-04: back to ~0.86 mA** (CH2 ~9.17 mV at 5 mV/div offset -15 mV, one sleep in four ~9.95 mV; no zero at this setting yet, +-0.05 mA). **The resoldering changed nothing, and SDA/SCL are high asleep, so the breakout's pull-ups draw nothing.** `U2_bme_resoldered.csv` |
 | **V** | DMM, supply on pin X | | does VSENSE or the cap leak into the measurement? | Pin V 3.10 V (not the supply's 4.5 V), pin X 0.0 V with the supply off: **the cap is isolated, no hidden path.** D1 1.22 V against the expected 1.55 V: the asleep XIAO loads the tap slightly, a few uA at most. The cap fell from ~3.83 V to 3.10 V while isolated overnight |
 
 **Reading the results:**
@@ -276,16 +277,24 @@ only if S2's sleep looks odd.
 * scope 192.168.94.12: CH1 100 mV/div offset -300 mV, **probe on 10x** (read
   x10); CH2 **5 mV/div offset -15 mV** (changed for U1), probe 1x; 50 ms/div,
   average
-* **BME280 VCC wire unsoldered** (SDA, SCL, GND still on)
+* everything soldered back as built (BME280 VCC restored, GND reflowed)
 
-**Done since:** BME280 VCC unsoldered (U1) - current went *up* to ~1.4-1.8 mA
-and drifted upwards, almost certainly because the BME280 is now back-powered
-through SDA/SCL. **The sculpture is in that state now.**
+**Done since:** BME280 VCC unsoldered (U1): current went *up* to ~1.4-1.8 mA
+and drifted - the breakout back-powered through SDA/SCL. Soldered back and its
+GND reflowed (U2): ~0.86 mA again, unchanged. SDA and SCL read high during
+sleep. **The sculpture is fully reconnected now.**
 
-**Next, first:** unsolder the BME280's SDA and SCL too (or the whole breakout),
-then repeat U1. Take a zero (wire across the shunt) at CH2's new setting,
-**5 mV/div, offset -15 mV**, which it was changed to for U1. Then continue
-with the table below.
+**Unsolder VCC alone and the part back-powers through its signal lines; that is
+what spoiled U1.** Take VCC *and* GND off together and there is no return path,
+so nothing can feed it backwards.
+
+**Next, first:** take a zero (wire across the shunt) at CH2's current setting,
+**5 mV/div, offset -15 mV**. Then either:
+
+* **BME280: unsolder VCC and GND** (SDA/SCL can stay), or
+* **e-paper: unsolder VCC.** In `sleep_probe` phases 0 and 1 its lines are
+  released; in phase 2 RST and CS are on ~45k pull-ups, which can back-feed at
+  most ~60 uA through its input diodes - small against 0.86 mA.
 
 **Next: split the hardware by unsoldering, one joint at a time**, `sleep_probe`
 running, supply on pin X, 2 min log each:
