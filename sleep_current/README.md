@@ -26,10 +26,24 @@ That is a sixteenth of the 400 uA. **The XIAO's own power path is not the
 problem, and an HT7533 cannot buy more than those ~25 uA.** The HT7533 is not
 being tested further.
 
-**Part 2, the integrated sculpture: started 2026-10-03.** First look: the
-sculpture sleeps at **~0.9 mA** on the lab supply at 4.5 V, against 25 uA for
-the bare board, with the charge LED confirmed removed. The extra current is the
-BME280 breakout or the e-paper module. See *Where this left off* at the end.
+**Part 2, the integrated sculpture: in progress.** Status 2026-10-04:
+
+* The sculpture sleeps at **~0.86-1.0 mA** on the lab supply at 4.5 V, cap and
+  panels cut off at the jumper - with the node firmware (S2, S3) **and** with
+  `sleep_probe`, which never touches the BME280 or the panel (P1-P3). So it is
+  **hardware**, not the node firmware. Once, briefly, it sat at ~340 uA.
+* **Ruled out:** the charge LED (desoldered, no LEDs anywhere), the D8 pull-up
+  (pin reads 3.3 V asleep), VSENSE and the cap (isolated, pin V 3.10 V vs
+  supply 4.5 V), the e-paper control lines (worth ~0.1 mA at most, S3/P2),
+  and commanding the BME280 to sleep and the e-paper into deep sleep (P3: no
+  change).
+* **Left:** a module's own circuitry (BME280 breakout regulator / level
+  shifter; e-paper board translator / booster), **the sculpture's XIAO itself**
+  - part 1 measured a different board - or a leakage path in the wire bends.
+  Firmware cannot split these further: next is unsoldering one VCC wire at a
+  time. See *Where this left off* at the end.
+* The wake: ~9 s at ~29 mA (CH1's probe is on 10x), matching the flash log's
+  65 mV per update on 4 F, so the cap really is ~4 F.
 
 Part 2 measures the sculpture with no soldering: the VCAP jumper is the break
 point, and it captures the wake as well as the sleep.
@@ -38,7 +52,7 @@ point, and it captures the wake as well as the sleep.
 
 | Path | What |
 | ---- | ---- |
-| `sleep_probe/sleep_probe.ino` | firmware for the breadboard XIAO: parks pins like the node, wakes for 1 s, sleeps 60 s, forever |
+| `sleep_probe/sleep_probe.ino` | minimal sleep firmware, never initialises BME280 or panel. v1 (part 1, P1): parks pins like the node, 1 s awake / 60 s asleep. v3 (now): 30 s sleeps in phases - nothing / BME280 to sleep / plus e-paper deep sleep - coded by burst width |
 | `analyze.py` | turns a `tools/scope_log.py` CSV into a sleep current, a cap leakage, or a wake/sleep cycle breakdown |
 | `data/<YYYY-MM-DD>/` | raw scope CSVs, one per test, named after the test ID |
 
@@ -210,7 +224,11 @@ Those millivolts are the flash log's units, so they compare directly with the
 | -- | ----- | ------ | --- | ------------------- |
 | **S1** | pin V, 4.00 V, XIAO off, panels covered, 1-2 h | charging current decaying to a floor | the real cap's leakage, at night voltage, in place | |
 | **S2** | pin X, 4.50 V, cap at ~4.0 V from S1, 20 min | ~260 mC per wake; sleep somewhere between 25 and 400 uA | the sculpture's wake cost and sleep current, directly | **First look, 2026-10-03 - not yet zeroed:** sleep **~0.87-0.93 mA** (CH2 9.15-9.74 mV, earlier no-current reading 0.34 mV). Wake ~15 s at **~21 mA** - CH1's probe turned out to be on 10x, so its readings are x10. Cap at 3.83 V, so this was normal cycling (`cycle_s` 60), not the hold state. **That is ~40x the bare board and ~2x the night's 400 uA.** Charge LED confirmed desoldered on the sculpture, so it is the BME280 breakout or the e-paper module. S1 skipped. `S2_first_look3.csv`, `S2_4V5.csv` (80 s, interrupted). `S2_first_look.csv` / `2` were taken with CH2 unconnected - ignore their CH2 |
-| **S3** | as S2, firmware holding the e-paper lines through sleep | | are the panel's floating inputs the extra sleep current? | only if S2's sleep is far above 25 uA |
+| **S3** | as S2, firmware holding the e-paper lines through sleep | | are the panel's floating inputs the extra sleep current? | **2026-10-04, v1.4 `park_epd 1`: no effect - sleep ~1.0 mA** (CH2 median 10.59 mV; 9.95-10.65 between wakes), against S2's ~0.9 mA. Wakes every 69 s (60 s + ~9 s awake), panel refreshing. **The floating e-paper lines are not the cause.** CH1 peaked at ~29.7 mV in each wake, which on 1x would be only ~3 mA - at odds with the ~29 mA the flash log implies (65 mV x 4 F / 9 s). CH1's probe setting is uncertain; check it, and the supply's own display during a refresh. `S3_park_epd1_4V5.csv` |
+| **P1** | sculpture running `sleep_probe` v1: never touches the BME280 or the panel | ~25 uA if the firmware is the cause | split hardware from node firmware | **2026-10-04: ~340 uA** in three sleeps, after a first stretch at **~1.25 mA**. D8 read 3.3 V asleep (its 10k pull-up draws nothing); D3, the e-paper RST, read 0 V. `P_sleep_probe_4V5.csv` |
+| **P2** | `sleep_probe` v2: e-paper lines rotated through untouched / RST+CS up / all down | | does a floating or low RST cost current? | **~860 / ~1020 / ~930 uA**, each twice, identical. RST held low costs nothing; pulling it up costs ~160 uA more. **The e-paper lines are worth ~0.1 mA at most.** Baseline back at ~860 uA, not P1's 340 - something switches between two levels. `P2_epd_states_4V5.csv` |
+| **P3** | `sleep_probe` v3: BME280 commanded to sleep; then also e-paper reset + deep sleep command, RST held high | a drop to ~25-50 uA in the phase that hits the culprit | find which part is awake | **No phase drops below ~860 uA** (all sleeps 860-964 uA). Either the commands did not take, or the ~0.86 mA is not a chip left awake but something static: a module's own regulator or level shifter, the sculpture's XIAO itself (part 1 measured a *different* XIAO), or a leakage path in the wiring. `P3_cmd_sleep_4V5.csv` |
+| **V** | DMM, supply on pin X | | does VSENSE or the cap leak into the measurement? | Pin V 3.10 V (not the supply's 4.5 V), pin X 0.0 V with the supply off: **the cap is isolated, no hidden path.** D1 1.22 V against the expected 1.55 V: the asleep XIAO loads the tap slightly, a few uA at most. The cap fell from ~3.83 V to 3.10 V while isolated overnight |
 
 **Reading the results:**
 
@@ -240,7 +258,40 @@ reconnect the supply on pin X. The cold boot runs one cycle, and the next wake
 draws the hold frame and holds. Expect the same sleep current as S2. Run this
 only if S2's sleep looks odd.
 
-## Where this left off - 2026-10-03, evening
+## Where this left off - 2026-10-04
+
+**Sculpture state, as left:**
+
+* running **`sleep_probe` v3**, *not* the node firmware - it does not update the
+  panel. Back to normal needs a reflash of `proto_epaper_esp32c3` v1.4.
+* settings in NVS, kept across the reflashes: **`cycle_s` 60, `park_epd` 1**.
+  Set `cycle_s=300` (and `park_epd` as decided) before normal running.
+* flash log erased 2026-10-03 evening
+* jumper cap **off**, lab supply + on pin X at 4.5 V, − through the 10.1 ohm
+  shunt to the frame, 1N5817 removed, panels covered
+* **cap at 3.10 V - below `v_floor` 3.25 V.** The node firmware would hold
+  without drawing anything. Charge it through pin V (S1) before a node-firmware
+  test, or before closing the jumper for normal running.
+* scope 192.168.94.12: CH1 100 mV/div offset -300 mV, **probe on 10x** (read
+  x10); CH2 2 mV/div offset -6 mV, probe 1x; 50 ms/div, average
+
+**Next: split the hardware by unsoldering, one joint at a time**, `sleep_probe`
+running, supply on pin X, 2 min log each:
+
+| Step | Unsolder | Falls to ~25-50 uA means |
+| ---- | -------- | ------------------------ |
+| 1 | e-paper VCC wire | the e-paper module |
+| 2 | BME280 VCC wire | the BME280 breakout |
+| 3 | still high with both off | the sculpture's XIAO, or the wiring |
+
+```
+python tools/scope_log.py --ip 192.168.94.12 --channel 1,2 --interval 0.25 --duration 120 --out sleep_current/data/<date>/U<step>.csv
+```
+
+Sleep current = (CH2 median - 0.34 mV) / 10.1 ohm.
+
+### Previous handoff - 2026-10-03, evening
+
 
 **Sculpture state, as left:**
 
