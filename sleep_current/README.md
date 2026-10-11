@@ -26,6 +26,15 @@ That is a sixteenth of the 400 uA. **The XIAO's own power path is not the
 problem, and an HT7533 cannot buy more than those ~25 uA.** The HT7533 is not
 being tested further.
 
+**Part 1 reopened, 2026-10-11 - see *Part 1b*.** The same bare board, now
+running `sleep_probe` **v3**, sleeps at **~0.59 mA**, with one sleep in ~6 at
+**~3.0 mA**. Same board, same shunt, same firmware from one sleep to the
+next - and the sleep current does not repeat. The two-level behaviour the
+sculpture shows (340 / 860 / 1250 uA) therefore **also happens on a bare XIAO
+with nothing attached**: it is in the XIAO or in the firmware, not in the
+BME280, the e-paper or the wire bends. Not yet known whether v3 (vs part 1's
+v1) is what raises it.
+
 **Part 2, the integrated sculpture: in progress.** Status 2026-10-04:
 
 * The sculpture sleeps at **~0.86-1.0 mA** on the lab supply at 4.5 V, cap and
@@ -121,6 +130,37 @@ and it prints its settings once.
 
 **Conclusion:** the XIAO alone sleeps at ~10-25 uA through its own `5V` path.
 The sculpture's ~400 uA is not the board.
+
+## Part 1b - the D8 pull-up on the bare XIAO, 2026-10-11
+
+**Question:** does the sculpture's 10k from 3V3 to D8 (GPIO8, strapping pin)
+cost sleep current? Theory: I = (3V3 - V_D8) / 10k, so zero while the firmware
+leaves D8 high-Z, ~330 uA only if D8 is pulled low.
+
+**Setup:** the part 1 breadboard XIAO, flashed with `sleep_probe` **v3** (never
+touches GPIO8 except clearing old holds). Lab supply **4.5 V** on `5V`, 10.1 ohm
+low-side shunt, **no 1N5817**, no USB. Scope as left from part 2: CH2 on the
+shunt, **5 mV/div, offset -15 mV**, 1x; CH1 moved to **D8**, 1 V/div, offset
+-2 V, probe 10x. All ground clips on supply -.
+
+| ID | Setup | Result / conclusion |
+| -- | ----- | ------------------- |
+| **D1** | 10k 3V3 -> D8, first try | Sleeps alternate ~5.9 mV and ~33 mV on CH2. D8 read **2.2 V** on the scope throughout - the resistor was making **poor breadboard contact**. Discard. `D1_d8_pullup.csv`, `D1_d8_volts_zero.csv` (D8 voltage with the zero wire on) |
+| **Z** | wire across the shunt | **CH2 1.08 mV** (0.74-2.14), CH1 0.35 mV at that point. The zero for every CH2 reading at 5 mV/div / -15 mV. `Z_after_D1.csv` |
+| **DMM** | static checks | R = 9.97 kohm. 3V3 pin 3.28 V. D8 without R: 0.07 V (high-Z input, floats low). D8 with R reseated: **3.25 V**, with or without the scope probe on it. Scope then agreed: 3.29 V |
+| **D1b** | 10k reseated, 3 min | **D8 a steady 3.30 V** through sleeps and wakes, so **the pull-up draws ~0-3 uA - ruled out, as the theory says.** But the board's sleep: **~7.0 mV = ~0.59 mA** in four sleeps, **~31.4 mV = ~3.0 mA** in one (the one after the longest wake, 32.5 s wake-to-wake, consistent with phase 2 - not proven: the scope's averaging smears wake widths by ~1 s, and phase 2's second sleep was not high). `D1b_d8_pullup.csv` |
+
+**Conclusions:**
+
+* **The D8 pull-up costs nothing** while D8 is high-Z. Confirmed on the bench.
+  Breadboard contacts can lie: check the pin voltage, not just the part.
+* **This bare XIAO now sleeps at ~0.59 mA, not part 1's ~25 uA**, and
+  **switches between sleep levels** (~0.59 / ~3.0 mA). What differs from part 1:
+  `sleep_probe` v3 instead of v1, 4.5 V instead of 4.0/5.0 V (part 1 found no
+  voltage effect), no 1N5817.
+* So the sculpture's high, two-level sleep is **not explained by its modules**:
+  a bare XIAO does it too. Either v3 does it, or the C3 sometimes misses its
+  proper deep-sleep state.
 
 ## Part 2 - the integrated sculpture
 
@@ -260,7 +300,91 @@ reconnect the supply on pin X. The cold boot runs one cycle, and the next wake
 draws the hold frame and holds. Expect the same sleep current as S2. Run this
 only if S2's sleep looks odd.
 
-## Where this left off - 2026-10-04
+## Candidates for the ~0.86 mA - overview, 2026-10-11
+
+**What the results so far already say:**
+
+* **Hardware, not firmware.** Bare XIAO 10-25 uA; sculpture ~0.86-1.0 mA at
+  4.5 V with the node firmware *and* with `sleep_probe`.
+* **It switches between levels:** ~340 uA once (P1), ~860 uA usually, ~1.25 mA
+  once. A fixed resistive leak does not do that - something changes state, or a
+  contact is intermittent.
+* **0.86 mA at 3.3 V is ~3.8 kohm.** Far too low for flux residue or the 1M
+  divider: a real current path or an active circuit.
+* **Bench > night.** ~0.86 mA at 4.5 V on the bench, but the night's ~400 uA at
+  3.4-2.8 V *includes* the cap's own leakage. The draw may depend on supply
+  voltage. Anything on the 3V3 rail would not (the regulator holds it constant
+  down to ~3.4 V), so **this hints at the 5V/VCAP side.** Not yet tested - it was
+  step 2 of the 10-03 handoff.
+* **Ruled out by firmware:** commanding BME280 and e-paper to sleep, and holding
+  the e-paper lines (holds are set correctly, including
+  `gpio_deep_sleep_hold_en()`). The e-paper RST moves the current by ~160 uA, so
+  the module reacts to its lines - but that is not the baseline.
+
+**Suspects, roughly most likely first:**
+
+| # | Suspect | For | Against |
+| - | ------- | --- | ------- |
+| 1 | **XIAO charge IC / 5V side** - no battery fitted, charger input on the `5V` pin | Fits the voltage dependence (a battery-less charger may detect and retry above its turn-on voltage) and the level switching. Also: a wire bend touching the B+/B- pads underneath | The bare XIAO at 5.0 V was fine - but that was a different board |
+| 2 | **The sculpture's XIAO itself** - a GPIO's protection diodes damaged by soldering heat or ESD, or a different board revision | Part 1 never measured this board. A damaged pad can leak mA | No direct evidence |
+| 3 | **E-paper module circuitry** - booster MOSFET half-on if its gate (GDR) floats (VCC -> inductor -> MOSFET -> sense resistor -> GND), an LDO or level shifter on the driver board, or damage from the BUSY pad break | A half-on MOSFET drifts and toggles. The module does react to RST. The BUSY break is a known injury | The deep sleep command did nothing - though it may not have taken |
+| 4 | **BME280 breakout's LDO / BSS138 level shifters** (purple 4-pin boards usually have both) | U1 shows it can draw odd, drifting current when back-fed | The sleep command did nothing; SDA/SCL high, so the pull-ups draw nothing |
+| 5 | **Leak or near-short in the wire bends** - two bends almost touching, a whisker, the leftover GPIO10 wire to the broken BUSY pad | An intermittent contact explains the level jumps, and could follow temperature or flexing | 3.8 kohm is fairly solid for a near-short |
+| 6 | **Something on the 5V/VCAP net that should be on 3V3** - e.g. a module's VIN on pin X | Explains the voltage dependence | The pin map says 3V3 - but not checked with a meter |
+
+**Cheapest tests first - the first three need no soldering:**
+
+1. **Supply voltage sweep:** 5.0 / 4.5 / 4.0 / 3.6 V on pin X, 2 min each.
+   Current tracks the voltage -> 5V side (#1, #6). Flat -> 3V3 side (#2-#5).
+2. **Hold the XIAO's RESET button** (EN low) while logging. The C3 is then off
+   (~1 uA). If ~0.86 mA remains, it is the modules or the wiring, not the C3. The
+   module lines float meanwhile, so it is a rough split.
+3. **Bench 3.3 V into `3V3`, `5V` open.** Charger and onboard regulator drop out.
+   If the current falls to ~25-50 uA, it is #1.
+4. While logging, **flex and poke the wire bends** with a plastic tool and watch
+   CH2 for jumps (#5). Read the regulator / level shifter markings on both modules
+   with a loupe and look up their quiescent currents (#3, #4). Ohm out pin X to
+   3V3 and pin X to GND with everything off (#6).
+5. Only then the soldering splits below: **e-paper VCC off**, then **BME280 VCC
+   and GND off together**.
+
+## Where this left off - 2026-10-11
+
+**Bench state, as left:**
+
+* **breadboard XIAO** (not the sculpture) running **`sleep_probe` v3**, 10k
+  3V3 -> D8 still fitted (proven harmless), 4.5 V on `5V`, 10.1 ohm shunt, no
+  diode, no USB, **zero wire off**
+* scope 192.168.94.12: **CH1 on D8, 1 V/div, offset -2 V, channel probe set to
+  10x** (changed from the sculpture setup); **CH2 on the shunt, 5 mV/div,
+  offset -15 mV, 1x, zero 1.08 mV**. Extra probes are available for CH3/CH4
+* the sculpture is untouched since 2026-10-04 (see below)
+* uncommitted: a stray one-character edit in
+  `proto_epaper_esp32c3.ino` (`as` -> `ast` in the VDIV_CAL comment) - not
+  part of this work, left out of the commit
+
+**Next, in order:**
+
+1. **Which sleeps are high?** CH3 on **D3 (GPIO5)**, ground clip on supply -.
+   In phase 2 v3 holds D3 high through sleep; in phases 0/1 it floats. Log
+   **6 min** (two full phase cycles) with CH2 + CH3. High sleeps only in phase 2
+   -> a pin-hold / firmware effect. High sleeps in any phase -> the C3
+   sometimes misses its deep-sleep state.
+2. **D0:** remove the 10k, 3 min log - should match D1b.
+3. **Flash `sleep_probe` v1** (part 1's version, from git) on the same board and
+   log. Back at ~25 uA -> v3 raises the sleep current, and every sculpture
+   result taken with v3 (P3, U1, U2) needs rereading.
+4. Only then back to the sculpture and the *Candidates* list above - the bare
+   board result moves suspect #2 (the XIAO itself) and the firmware up, and the
+   modules down.
+
+```
+python tools/scope_log.py --ip 192.168.94.12 --channel 3,2 --interval 0.25 --duration 360 --out sleep_current/data/<date>/D1c_phase.csv
+```
+
+Sleep current = (CH2 median - 1.08 mV) / 10.1 ohm.
+
+### Previous handoff - 2026-10-04
 
 **Sculpture state, as left:**
 
