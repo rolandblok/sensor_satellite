@@ -35,6 +35,13 @@ with nothing attached**: it is in the XIAO or in the firmware, not in the
 BME280, the e-paper or the wire bends. Not yet known whether v3 (vs part 1's
 v1) is what raises it.
 
+**2026-10-16 - see *Part 1c*: it is the firmware.** Measured properly (zero
+with the probe tip on its own ground, clips on the shunt's leads), v3 sleeps at
+0.52 or 3.2 mA, about half the sleeps high, at random and not tied to its
+phases - and the same with the charger and regulator bypassed (3.3 V into
+`3V3`). A minimal `sleep_min` on the same board sleeps at ~15-90 uA with **no**
+high sleeps, with or without USB CDC. Next: v3's pin holds (bisect B).
+
 **Part 2, the integrated sculpture: in progress.** Status 2026-10-04:
 
 * The sculpture sleeps at **~0.86-1.0 mA** on the lab supply at 4.5 V, cap and
@@ -62,6 +69,7 @@ point, and it captures the wake as well as the sleep.
 | Path | What |
 | ---- | ---- |
 | `sleep_probe/sleep_probe.ino` | minimal sleep firmware, never initialises BME280 or panel. v1 (part 1, P1): parks pins like the node, 1 s awake / 60 s asleep. v3 (now): 30 s sleeps in phases - nothing / BME280 to sleep / plus e-paper deep sleep - coded by burst width |
+| `sleep_min/sleep_min.ino` | the least possible: 2 s awake, 15 s deep sleep, no Serial, no pins. The baseline (N1) |
 | `analyze.py` | turns a `tools/scope_log.py` CSV into a sleep current, a cap leakage, or a wake/sleep cycle breakdown |
 | `data/<YYYY-MM-DD>/` | raw scope CSVs, one per test, named after the test ID |
 
@@ -161,6 +169,172 @@ shunt, **5 mV/div, offset -15 mV**, 1x; CH1 moved to **D8**, 1 V/div, offset
 * So the sculpture's high, two-level sleep is **not explained by its modules**:
   a bare XIAO does it too. Either v3 does it, or the C3 sometimes misses its
   proper deep-sleep state.
+
+## Part 1c - checking the setup, and a clean repeat, 2026-10-16
+
+**Question:** is the bare board's ~0.59 / ~3.0 mA real, or the measurement?
+
+**Setup:** as part 1b - breadboard XIAO, `sleep_probe` v3, 10k 3V3 -> D8 still
+fitted, 4.5 V on `5V`, 10.1 ohm shunt, no 1N5817, no USB, only the lab supply.
+CH2 on the shunt, 1x, 20 MHz limit, average 4.
+
+**The jumper zero is not a zero on a breadboard.** With a jumper wire across the
+shunt, CH2 read 2.1 mV at 5 mV/div (drifting 2.3 -> 1.3 mV in a minute), 3.1 mV
+at 2 mV/div, 2.1 mV at 1 mV/div - against 0.33 mV on 10-03 at the same setting.
+With the **probe tip clipped to its own ground clip** on supply -, CH2 read a
+steady **0.43 mV (+-0.03) at both 1 mV/div and 5 mV/div**. So the scope is fine
+and the extra ~1.7 mV came from the breadboard: the jumper and its contacts
+still carry the board's current, and their few ohms wander. From now on:
+
+* **zero = probe tip on its own ground clip**, not a jumper across the shunt
+* **clip CH2's tip and ground directly onto the shunt resistor's leads**, so no
+  breadboard contact is in the measured path
+
+`Z1`-`Z3` are the jumper zeros, `Z4`/`Z5` the tip-on-ground zeros, `C0` the
+board found unpowered (CH2 2.5-3.1 mV with no current - the floating input).
+
+**M1 - clips on the shunt's leads, 3 min.** Current = (CH2 - 0.43 mV) / 10.1 ohm.
+The wakes are smeared over 1-4 s by the averaging, so their widths cannot be
+read; the sleeps between them are flat.
+
+| Sleep | Time | CH2 | Current |
+| ----- | ---- | --- | ------- |
+| 1 | 0-24 s | 33.0 mV | **3.2 mA** |
+| 2 | 26-57 s | 5.97 mV | **0.549 mA** |
+| 3 | 62-89 s | 5.98 mV | 0.549 mA |
+| 4 | 92-121 s | 32.9 mV | **3.2 mA** |
+| 5 | 124-150 s | 5.97 mV | 0.549 mA |
+| 6 | 154-180 s | 5.98 mV | 0.549 mA |
+
+`M1_clips_on_shunt.csv`.
+
+**Conclusions:**
+
+* **It reproduces.** Low level **549 uA**, the same to 0.01 mV over four sleeps;
+  high level **3.2 mA**, **every third sleep**. Part 1b's 0.59 / 3.0 mA were
+  close; their jumper zero (1.08 mV) was the error.
+* **Every third sleep does not fit v3's phases** (p0 p0 p1 p1 p2 p2), so it is
+  not simply "phase 2 holds the e-paper pins".
+* 3.2 mA is neither awake (~20 mA) nor deep sleep (~5-25 uA). Part 1's 25 uA on
+  this same board is still 20x below the low level, and unexplained.
+* Not yet cross-checked with a second instrument (DMM in series, mA range).
+
+**M2 - 10k off D8, CH3 on D8, CH1 on D3, 4 min.** D3 (GPIO5, EPD_RST) is held
+high through sleep only in v3's phase 2, so it tags the phase. Sleeps in order:
+
+| Sleep | Time | D3 asleep | Phase | Current |
+| ----- | ---- | --------- | ----- | ------- |
+| 0 | 0-11 s (tail) | low | 1 | **3.2 mA** |
+| 1 | 17-44 s | high | 2 | **3.2 mA** |
+| 2 | 52-76 s | high | 2 | 0.53 mA |
+| 3 | 82-107 s | low | 0 | 0.53 mA |
+| 4 | 113-137 s | low | 0 | 0.53 mA |
+| 5 | 145-168 s | low | 1 | 0.53 mA |
+| 6 | 178-200 s | low | 1 | **3.2 mA** |
+| 7 | 209-232 s | high | 2 | 0.53 mA |
+| 8 | 237- s (head) | high | 2 | **3.2 mA** |
+
+`M2_no_pullup_d3_d8.csv`. Phases inferred from D3 and v3's order p0 p0 p1 p1
+p2 p2.
+
+* **D8 sits at ~0 V through every sleep and wake**, high or low current - it
+  plays no part. The low level is 0.53 mA (0.549 mA in M1 with the 10k; the
+  ~20 uA difference is about one ADC step at 5 mV/div).
+* **The high sleeps are not tied to a phase**: they come in phase 1 (D3 low)
+  and in phase 2 (D3 high), and the same phase is high one round and low the
+  next. The pattern is irregular - here H H L L L L H L H, in M1 H L L H L L -
+  about 4 sleeps in 10. So it is **not v3's pin holds**. Whether a sleep comes
+  out at 0.53 or 3.2 mA is decided some other way, per sleep.
+* The current changes over several seconds around each wake (e.g. 5.8 -> 33 mV
+  over ~9 s at 169-178 s), longer than the averaging smear.
+
+**M3 - as M2, 10 min, 20 sleeps.** M2 had no high sleep in phase 0 (2 seen), and
+phase 0 is the only wake without I2C (`bmeSleep()` on a bus with no BME280) -
+v1, the 25 uA firmware, never used I2C either. This run tests that.
+
+| Sleep | Phase | Current | | Sleep | Phase | Current |
+| ----- | ----- | ------- | - | ----- | ----- | ------- |
+| 0 | 0 | 0.52 mA | | 10 | 2 | **3.20 mA** |
+| 1 | 1 | **3.20 mA** | | 11 | 0 | 0.52 mA |
+| 2 | 1 | **3.20 mA** | | 12 | 0 | **3.26 mA** |
+| 3 | 2 | 0.52 mA | | 13 | 1 | 0.52 mA |
+| 4 | 2 | **3.26 mA** | | 14 | 1 | **3.20 mA** |
+| 5 | 0 | **3.20 mA** | | 15 | 2 | **3.26 mA** |
+| 6 | 0 | 0.52 mA | | 16 | 2 | 0.52 mA |
+| 7 | 1 | 0.52 mA | | 17a | 0 | **3.26 mA** |
+| 8 | 1 | 0.52 mA | | 17b | 0 | **3.20 mA** |
+| 9 | 2 | 0.52 mA | | 18 | 1 | 0.52 mA |
+
+`M3_10min_phases.csv`. Phase from D3 (high = phase 2, the two sleeps before a
+D3 pair are phase 1). The wake between 17a and 17b shows on CH2 as a bump of
+only 0.7 mV - the averaged VAVG can all but miss a 0.5 s phase 0 burst - but
+the level steps 33.4 -> 32.8 mV across it.
+
+| Phase | Wake does | Low | High |
+| ----- | --------- | --- | ---- |
+| 0 | nothing | 3 | **4** |
+| 1 | I2C | 4 | 3 |
+| 2 | I2C + e-paper pins | 3 | 3 |
+
+* **No relation to the phase.** Phase 0, with no I2C, is high as often as the
+  others. The I2C idea is dead, and so is any firmware-phase explanation.
+* **Half the sleeps are high** (10 of 20), in runs: L H H L H H L L L L H L H L
+  H H L H H L. Highs often follow highs across a wake (1-2, 4-5, 14-15,
+  17a-17b), so the state can survive a wake.
+* **Two high sub-levels**, 32.8 and 33.3-33.4 mV (3.20 / 3.26 mA); the low level
+  is one, 5.67-5.73 mV (0.52 mA).
+* D8 stayed at ~0 V throughout (CH3 -0.012 to -0.008 V).
+
+**B1 - lab supply 3.30 V straight into `3V3`, `5V` open, 10 min, 19 sleeps.**
+Bypasses the charger (ETA4054, no battery) and the onboard regulator. Shunt,
+clips and probes as M3. `B1_3V3_direct.csv`.
+
+| Phase | Low | High |
+| ----- | --- | ---- |
+| 0 | 3 | 4 |
+| 1 | 2 | 3 |
+| 2 | 4 | 3 |
+
+Order: L H H L H H L L H H H L H H L L L H H (sleep 0 is phase 0).
+
+* **The two levels survive with the 5 V side cut out**: low **0.40-0.42 mA**,
+  high **2.93-3.11 mA**, half the sleeps high, no relation to the phase. So it
+  is **not the charger or the regulator** - it is on the 3.3 V side: the C3, its
+  flash, or something else on that rail.
+* The low level fell from 0.52 to 0.41 mA: ~110 uA was the 5 V side (or the
+  regulator's reverse leakage now that its output is driven - not separable).
+* **After every wake the current decays over ~8-10 s** to the sleep level (e.g.
+  25 -> 4.6 mV over 89-101 s), and rises into a high sleep over ~6-10 s. D3,
+  through the same averaging, steps within one sample, so this is **not scope
+  smear** - the board really settles over seconds.
+
+**N1 - `sleep_min` on 3.3 V into `3V3`, 5 min, 17 wakes.** New sketch
+`sleep_min/sleep_min.ino`: `delay(2000)`, 15 s timer deep sleep, nothing else -
+no Serial (built `CDCOnBoot=cdc`, which is *disabled* on this board), no pins,
+no holds. Flashed by esptool (four images), then power-cycled from the lab
+supply. `N1_sleep_min_3V3.csv`.
+
+* **Every sleep is low: 32-94 uA**, read as the median of the last 2 s before
+  each wake. **No 0.4 mA level, no 3 mA level**, 0 of 17. Wake period 17.00 s,
+  as programmed.
+* That is Seeed's 44 uA board figure and part 1's 25 uA. **The board is fine;
+  the 0.4 / 3 mA sleeps come from something v3 does.**
+* The ~10 s decay after each wake is still there with this sketch, so it is not
+  part of the two-level problem. It may be CH2 recovering from overload (the
+  ~200 mV wake against 5 mV/div) - D3's clean steps were at 1 V/div, so they
+  do not rule that out. The floors above are still on that slope, so the true
+  floor is at or below them; at 5 mV/div one ADC step is ~20 uA.
+* Left between `sleep_min` and v3: **USB CDC enabled**, and **v3's pin parking
+  with holds** (`INPUT_PULLUP` + hold on GPIO20/2, `INPUT_PULLDOWN` + hold on
+  GPIO10, `gpio_deep_sleep_hold_en()`). v1 had both and measured 25 uA in part
+  1, so it may take the two together. Bisect: A = `sleep_min` built with
+  `CDCOnBoot=default`; B = `sleep_min` + phase 0's parking.
+
+**N2 - bisect A: `sleep_min` built with `CDCOnBoot=default` (CDC enabled), 3.3 V
+into `3V3`, 5 min, 18 wakes.** `N2_sleep_min_cdc_3V3.csv`. Period 17.02 s. The
+highest sample in the run is 19.9 mV, inside a wake; **no sleep near 3 mA or
+held at 0.4 mA**. Sleeps settle to ~0.6 mV, ~15-20 uA. **USB CDC is not the
+cause.** Left: v3's pin parking and holds (bisect B).
 
 ## Part 2 - the integrated sculpture
 
@@ -348,7 +522,74 @@ only if S2's sleep looks odd.
 5. Only then the soldering splits below: **e-paper VCC off**, then **BME280 VCC
    and GND off together**.
 
-## Where this left off - 2026-10-11
+## Where this left off - 2026-10-16
+
+**The finding of the day: the board is fine, `sleep_probe` v3 causes the 0.4 /
+3 mA sleeps.** A bare `sleep_min` sleeps at ~15-90 uA with no high sleeps at all
+(N1), and enabling USB CDC does not change that (N2). See *Part 1c*.
+
+| Build | CDC | v3 pin parking + holds | High sleeps |
+| ----- | --- | ---------------------- | ----------- |
+| v3, 3.3 V into `3V3` (B1) | on | yes | 10 of 19 |
+| `sleep_min` (N1) | off | no | 0 of 17 |
+| `sleep_min` + CDC (N2) | on | no | 0 of 18 |
+| **`sleep_min` -DPARK=1 (B)** | off | yes | **next** |
+
+**Bench state, as left:**
+
+* **breadboard XIAO** (MAC 94:a9:90:6b:62:7c), running **`sleep_min` built with
+  `CDCOnBoot=default`** (variant A, the N2 build). 2 s awake, 15 s asleep
+* **lab supply 3.30 V straight into `3V3`, `5V` open** (bypasses charger and
+  regulator). Never put more than 3.3 V on that pin. Disconnect it before USB
+* 10.1 ohm low-side shunt, **no 1N5817, no zero wire**, **10k off D8**, no USB
+* scope 192.168.94.12: **CH1 on D3** (1 V/div, offset -2 V, scope probe 10x);
+  **CH2 clipped directly on the shunt resistor's leads** (5 mV/div, offset
+  -15 mV, 1x, 20 MHz, average 4); **CH3 on D8** (1 V/div, -2 V, scope probe 1x)
+* **zero = CH2 tip on its own ground clip = 0.43 mV.** Not a jumper across the
+  shunt - on the breadboard that read 1.1-3.1 mV and wandered (*Part 1c*)
+* uncommitted, deliberately: the stray `as` -> `ast` in
+  `proto_epaper_esp32c3.ino`'s VDIV_CAL comment - not part of this work
+
+**Next, in order:**
+
+1. **Bisect B:** flash `sleep_min` with `-DPARK=1` and `CDCOnBoot=cdc` - v3's
+   phase 0 `parkPins()` verbatim (pull-ups held on GPIO20/GPIO2, pull-down held
+   on GPIO10, `gpio_deep_sleep_hold_en()`). Log 5 min, count high sleeps.
+   * high sleeps back -> the holds cause it. Then split further: GPIO2 alone
+     (strapping pin), GPIO20 alone, without `gpio_deep_sleep_hold_en()`.
+   * still none -> it is something else in v3; add v3's pieces one at a time
+     (the cold-boot `HWCDC::isPlugged()` loop, `bmeSleep()`, `epdDeepSleep()`,
+     phase 2's extra holds, the 30 s sleep).
+   * Puzzle to keep in mind: **v1 had CDC on and the same three holds and
+     measured 25 uA in part 1** on this same board.
+2. Once found, check the node firmware (`proto_epaper_esp32c3`) for the same
+   cause - its `parkPins()` is where v1/v3's came from - and re-measure the
+   sculpture, whose ~0.86 mA / 340 uA two-level sleep looks like the same thing.
+
+**Flashing (no arduino-cli upload):** supply off `3V3`, USB in, BOOT dance
+(hold BOOT, tap RESET, release BOOT), then:
+
+```
+arduino-cli compile --fqbn esp32:esp32:XIAO_ESP32C3:CDCOnBoot=cdc --build-property "compiler.cpp.extra_flags=-DPARK=1" --output-dir <out> sleep_current/sleep_min
+esptool --chip esp32c3 --port COM7 --baud 460800 --before no-reset --after hard-reset write-flash -z --flash-mode keep --flash-freq keep --flash-size keep 0x0 <out>/sleep_min.ino.bootloader.bin 0x8000 <out>/sleep_min.ino.partitions.bin 0xe000 <core>/tools/partitions/boot_app0.bin 0x10000 <out>/sleep_min.ino.bin
+```
+
+`compile` exits 1 on a harmless post-build `Copy-Item` hook; the binaries are
+there. Then USB out, supply on (that power cycle also clears old holds).
+`CDCOnBoot=cdc` is CDC *disabled* on the XIAO definition.
+
+**Measuring (5 min, ~17 sleeps):**
+
+```
+python tools/scope_log.py --ip 192.168.94.12 --channel 1,2,3 --interval 0.25 --duration 300 --out sleep_current/data/<date>/<ID>.csv
+```
+
+Current = (CH2 - 0.43 mV) / 10.1 ohm. Low v3 sleep ~4.5-5.7 mV, high ~30-33 mV;
+`sleep_min` sleeps settle to ~0.6-1 mV. After every wake CH2 decays over ~10 s
+(perhaps CH2 recovering from the ~200 mV overload), so read a sleep from its
+last 2 s.
+
+### Previous handoff - 2026-10-11
 
 **Bench state, as left:**
 
