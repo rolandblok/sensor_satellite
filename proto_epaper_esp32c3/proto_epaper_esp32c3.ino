@@ -169,6 +169,9 @@
 #define VCAP_HOLD    3.50f // cycling stops below this
 #define VCAP_RESUME  3.80f // and does not restart until this - the hysteresis
 #define VCAP_FLOOR   3.25f // below this, do not even spend a refresh saying so
+#ifndef CYCLE_MIN_S             // lowest cycle_s the settings accept; -DCYCLE_MIN_S=10
+#define CYCLE_MIN_S  60    // for a bench test build only
+#endif
 #ifndef HOLD_S
 #define HOLD_S       900   // poll interval while held off
 #endif
@@ -300,7 +303,7 @@ static const esp_partition_t *gPart = nullptr;
 // the worst it gets is the defaults.
 static const char *cfgProblem(const Config &c) {
   if (c.magic != CFG_MAGIC)                     return "bad magic";
-  if (c.cycleS < 60)                            return "cycle_s below 60";
+  if (c.cycleS < CYCLE_MIN_S)                   return "cycle_s below CYCLE_MIN_S";
   if (c.holdS  < 10)                            return "poll_s below 10";
   if (c.parkEpd > 1)                            return "park_epd must be 0 or 1";
   if (!(c.vFloor >= 2.50f && c.vResume <= 5.00f)) return "voltages outside 2.50-5.00";

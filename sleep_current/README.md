@@ -44,8 +44,10 @@ high sleeps, with or without USB CDC.
 
 **2026-10-23: the cause is `parkPins()`** - pulls latched with `gpio_hold_en` and
 `gpio_deep_sleep_hold_en()` before deep sleep (N3). Node firmware **v1.5** sets
-`PARK_PINS 0` and sleeps at ~45-80 uA on the bare board (N4, N5). Next: the
-sculpture on v1.5.
+`PARK_PINS 0` and sleeps at ~45-80 uA on the bare board (N4, N5). **On the
+sculpture, v1.5 sleeps at a steady ~175 uA (V1)** - down from ~0.86 mA, and no
+second level. The ~130 uA left above the bare board is the attached modules or
+the wiring; not yet split.
 
 **Part 2, the integrated sculpture: in progress.** Status 2026-10-04:
 
@@ -498,6 +500,7 @@ Those millivolts are the flash log's units, so they compare directly with the
 | **P3** | `sleep_probe` v3: BME280 commanded to sleep; then also e-paper reset + deep sleep command, RST held high | a drop to ~25-50 uA in the phase that hits the culprit | find which part is awake | **No phase drops below ~860 uA** (all sleeps 860-964 uA). Either the commands did not take, or the ~0.86 mA is not a chip left awake but something static: a module's own regulator or level shifter, the sculpture's XIAO itself (part 1 measured a *different* XIAO), or a leakage path in the wiring. `P3_cmd_sleep_4V5.csv` |
 | **U1** | BME280 **VCC wire only** unsoldered; SDA, SCL, GND still connected. `sleep_probe` v3 | ~25-50 uA if the BME280 was the load | is it the BME280? | **2026-10-04: not lower - ~1.4 mA rising to ~1.8 mA over 2 min** (CH2 15.1 -> 18.9 mV at 5 mV/div, offset -15 mV; no zero taken at that setting yet, so +-0.1 mA). Wakes normal, every ~31.5 s. **Not clean:** with only VCC off, the BME280 is back-powered through SDA/SCL, which the C3 holds high with its pull-ups during sleep - that can draw odd, drifting current. SDA and SCL must come off too, or the whole breakout. `U1_no_bme.csv` (2 mV/div, partly clipped), `U1_no_bme_5mVdiv.csv` |
 | **U2** | BME280 VCC soldered back (its GND may have been a poor joint; reflowed). DMM: SDA and SCL read high at the BME280 during sleep | | did the poor GND or the loose VCC cause it? | **2026-10-04: back to ~0.86 mA** (CH2 ~9.17 mV at 5 mV/div offset -15 mV, one sleep in four ~9.95 mV; no zero at this setting yet, +-0.05 mA). **The resoldering changed nothing, and SDA/SCL are high asleep, so the breakout's pull-ups draw nothing.** `U2_bme_resoldered.csv` |
+| **V1** | 2026-10-23: node **v1.5** (`PARK_PINS 0`), test build `-DCYCLE_S=15 -DHOLD_S=15 -DCYCLE_MIN_S=10`, NVS `cycle_s` 15 / `poll_s` 15. Supply 4.5 V on pin X, jumper off, cap 3.12 V - below `v_floor`, so every wake is the **hold path** (read Vcap, sleep; no panel refresh, which is why the panel's counter did not move). 5 min, CH2 only | tens of uA if `parkPins()` was the sculpture's cause too | does v1.5 fix the sculpture? | **Sleep a steady ~2.24 mV = ~175 uA** (CH2 median, 0.43 mV zero from the breadboard - no zero taken on the sculpture yet), **no high sleeps**. Down from ~0.86 mA: the holds were most of it here as well. The ~130 uA above the bare board (N4, ~45 uA) is the BME280 breakout, the e-paper module or the wiring - not yet split. Full-cycle path on the sculpture not measured yet. `../2026-10-23/V1_sculpture_v15_nopark_4V5.csv` |
 | **V** | DMM, supply on pin X | | does VSENSE or the cap leak into the measurement? | Pin V 3.10 V (not the supply's 4.5 V), pin X 0.0 V with the supply off: **the cap is isolated, no hidden path.** D1 1.22 V against the expected 1.55 V: the asleep XIAO loads the tap slightly, a few uA at most. The cap fell from ~3.83 V to 3.10 V while isolated overnight |
 
 **Reading the results:**
@@ -583,8 +586,15 @@ sleep sketch draws ~20 uA (N1, N2); adding the node's `parkPins()` gives 0.51 /
 ~3 mA at random (N3); node firmware **v1.5 with `PARK_PINS 0`** sleeps at
 ~45-80 uA on both its hold path (N4) and full-cycle path (N5). See *Part 1c*.
 
+**The sculpture on v1.5 (V1): ~175 uA asleep on the hold path, no two levels**
+- down from ~0.86 mA. See *Part 2*, row V1.
+
 **Bench state, as left:**
 
+* **the sculpture** (COM8) on **node firmware v1.5, test build
+  `-DCYCLE_S=15 -DHOLD_S=15 -DCYCLE_MIN_S=10`**, NVS settings **`cycle_s` 15,
+  `poll_s` 15** (`park_epd` 1 is stored but v1.5 ignores it). Cap being charged
+  by the user after V1 (it was at 3.12 V)
 * **breadboard XIAO** (MAC 94:a9:90:6b:62:7c) running **node firmware v1.5**,
   test build `-DCYCLE_S=15 -DHOLD_S=15` - not the 300 s default
 * **lab supply 3.30 V straight into `3V3`**, `5V` open. Never more than 3.3 V on
@@ -595,18 +605,19 @@ sleep sketch draws ~20 uA (N1, N2); adding the node's `parkPins()` gives 0.51 /
   CH1 on D3 (1 V/div, -2 V, probe 10x); **CH2 clipped on the shunt's leads**
   (5 mV/div, -15 mV, 1x, 20 MHz, average 4); CH3 on D8 (1 V/div, -2 V, 1x)
 * zero = CH2 tip on its own ground clip = 0.43 mV (2026-10-16)
-* the sculpture is untouched since 2026-10-04: still on `sleep_probe` v3
-
 **Next:**
 
-1. **The sculpture:** flash node v1.5 (300 s default, or a `-DCYCLE_S=60` test
-   build) and measure its sleep the part 2 way (lab supply on pin X, shunt, cap
-   off at the jumper). Power-cycle after flashing - v1.4's holds survive a
-   reflash (v1.5's `unparkPins()` also releases them on every boot now). If the
-   ~0.86 mA falls to tens of uA, the night problem is solved in firmware.
-2. Then set the sculpture back to normal running: `node_cfg.py cycle_s=300`,
-   jumper cap on, USB off, and charge the cap first (it was at 3.10 V).
-3. Open, lower priority: why v1 (same holds) measured 25 uA in part 1; the
+1. **The sculpture, full-cycle path:** with the cap above `v_resume` (3.80 V),
+   measure V2 as V1 - every wake then refreshes the panel. Take a zero on the
+   sculpture first (CH2 tip on its own ground clip).
+2. **The ~130 uA above the bare board:** BME280 breakout, e-paper module or
+   wiring - unsoldering one VCC+GND pair at a time, as planned for the 0.86 mA.
+3. **Lock-up below ~2.8 V** (2026-10-03): needs hardware, a supervisor on
+   CHIP_EN. Parts ordered 2026-10-23; to be written up when fitted.
+4. **Before normal running:** reflash a plain v1.5 build (no `-D` flags), then
+   `node_cfg.py --port COM8 cycle_s=300 poll_s=900`, jumper cap on, USB off.
+   A plain build refuses `cycle_s` below 60 and falls back to the defaults.
+5. Open, lower priority: why v1 (same holds) measured 25 uA in part 1; the
    one-pin-at-a-time bisect (`sleep_min -DPARK=1 -DPARK_MASK=1/2/4`,
    `-DPARK_GLOBAL=0`) would say which hold does it.
 

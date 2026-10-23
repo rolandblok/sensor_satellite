@@ -207,9 +207,10 @@ break-even; the cycle's own ~−70 mV cost is in the log, not on the panel.
 
 Indoor harvest measured 2–4 mA at low cap voltage (2026-08-21, both panels), and
 break-even for a 300 s cycle is roughly **1.0–1.5 mA**, so the trend arrow is
-expected to sit near flat indoors and go negative in poor light. Neither the
-awake current nor this configuration's sleep current is measured yet, so that
-break-even figure is an estimate.
+expected to sit near flat indoors and go negative in poor light. The sleep
+current is now measured - **~175 uA on the sculpture with v1.5** (2026-10-23,
+`sleep_current/`), down from ~0.86 mA before v1.5 stopped parking pins - but the
+awake current is not, so that break-even figure is still an estimate.
 
 ### The flash log
 
@@ -291,7 +292,7 @@ flash log. The `#define`s are only the defaults.
 | `v_hold` | 3.50 | cycling stops below this |
 | `v_resume` | 3.80 | and restarts at this |
 | `v_floor` | 3.25 | below this, not even a hold frame |
-| `park_epd` | 0 | 1 = hold the e-paper's RST/CS high and SCK/MOSI/DC low through sleep, instead of letting them float (v1.4). The S3 test in `sleep_current/` |
+| `park_epd` | 0 | 1 = hold the e-paper's RST/CS high and SCK/MOSI/DC low through sleep, instead of letting them float (v1.4). The S3 test in `sleep_current/`. **Ignored since v1.5**, which parks no pins at all (`PARK_PINS 0`): GPIO holds kept through deep sleep made the C3 sleep at 0.5 or 3 mA at random - see `sleep_current/README.md`, part 1c |
 
 ```
 python tools/node_cfg.py                          # show
@@ -302,7 +303,9 @@ python tools/node_cfg.py --defaults               # back to the #defines
 Or by hand in the console: `p` shows them, `s v_hold 3.40` sets one, `r`
 restores the defaults. The node refuses anything that could strand it, and says
 why: it needs `v_floor < v_hold < v_resume`, all within 2.50-5.00 V,
-`cycle_s >= 60` and `poll_s >= 10`. A stored set that ever fails that check is
+`cycle_s >= 60` and `poll_s >= 10`. The 60 is `CYCLE_MIN_S`; a bench test
+build can lower it (`-DCYCLE_MIN_S=10`, with `-DCYCLE_S=15 -DHOLD_S=15` for the
+defaults) to measure short cycles - never for normal running. A stored set that ever fails that check is
 ignored in favour of the defaults.
 
 They are read from flash on every cold boot and kept in RTC memory, so a timer
