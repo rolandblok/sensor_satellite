@@ -23,11 +23,13 @@
 #define PANEL_V2        1      // 1 = Waveshare 2.9" V2 (SSD1680, "V2" on the back)
                                // 0 = original V1 (IL3820)
 #define USE_DEEP_SLEEP  1      // 1 = sleep between cycles; drops the USB serial port
+#ifndef CYCLE_S                // -DCYCLE_S=15 for a bench test build
 #define CYCLE_S         300    // seconds between refreshes - keep >= 180 for e-paper
+#endif
                                // DEFAULT only: the live value is cfg.cycleS, which
                                // the serial console can change - see "settings"
 #define LOG_S           2      // serial log interval when not deep sleeping
-#define FW_VERSION      "v1.4" // shown small, bottom right of every frame. Bump it
+#define FW_VERSION      "v1.5" // shown small, bottom right of every frame. Bump it
                                // when reflashing, so a panel photograph says
                                // which build produced it.
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
@@ -122,7 +124,13 @@
 // GPIO8 is both a strapping pin (must be HIGH at boot) and the data line of
 // the onboard WS2812B pixel, which draws ~1 mA from 3V3 in every state. It is
 // left alone here - see parkPins() below.
-#define PARK_PINS       1
+//
+// OFF since v1.5 (2026-10-23). Measured on the bare XIAO: a sketch that only
+// sleeps draws ~20 uA; add exactly this parkPins() and sleeps come out at
+// 0.5 mA or ~3 mA, at random (sleep_current/README.md, N1-N3). The floating
+// pins it was meant to protect cost nothing measurable there. Others report
+// the same for gpio_deep_sleep_hold_en() on the C3 - see the README.
+#define PARK_PINS       0
 
 // The BOOT button, read as an ordinary input. GPIO9 is a strapping pin, but it
 // is only *sampled* at the instant reset is released - nothing looks at it
@@ -161,7 +169,9 @@
 #define VCAP_HOLD    3.50f // cycling stops below this
 #define VCAP_RESUME  3.80f // and does not restart until this - the hysteresis
 #define VCAP_FLOOR   3.25f // below this, do not even spend a refresh saying so
+#ifndef HOLD_S
 #define HOLD_S       900   // poll interval while held off
+#endif
 #define PARK_EPD     0     // 1 = hold the e-paper's control lines through sleep.
                            // A setting (park_epd), so it can be A/B tested
                            // without reflashing - see parkPins()
@@ -917,7 +927,8 @@ static void runCycle(const Reading &sense) {
 // Parked pins are latched across deep sleep; the hold must be released before a
 // pad can be driven again, or writes to it are silently ignored.
 static void unparkPins() {
-#if PARK_PINS
+  // Runs whatever PARK_PINS says: a build that parked may have left holds
+  // behind, and they survive a reflash.
   // GPIO8 and GPIO2 are included unconditionally and defensively: an earlier
   // build latched GPIO8 high, and a hold lives in the RTC domain and survives a
   // reflash until cleared. On the XIAO GPIO2 is also FORCE_SCL, so it is
@@ -935,7 +946,6 @@ static void unparkPins() {
                              (gpio_num_t)EPD_DC};
   for (gpio_num_t p : held) gpio_hold_dis(p);
   gpio_deep_sleep_hold_dis();
-#endif
 }
 
 // Park every pin that would otherwise float once the peripherals are asleep.

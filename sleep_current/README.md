@@ -40,7 +40,12 @@ with the probe tip on its own ground, clips on the shunt's leads), v3 sleeps at
 0.52 or 3.2 mA, about half the sleeps high, at random and not tied to its
 phases - and the same with the charger and regulator bypassed (3.3 V into
 `3V3`). A minimal `sleep_min` on the same board sleeps at ~15-90 uA with **no**
-high sleeps, with or without USB CDC. Next: v3's pin holds (bisect B).
+high sleeps, with or without USB CDC.
+
+**2026-10-23: the cause is `parkPins()`** - pulls latched with `gpio_hold_en` and
+`gpio_deep_sleep_hold_en()` before deep sleep (N3). Node firmware **v1.5** sets
+`PARK_PINS 0` and sleeps at ~45-80 uA on the bare board (N4, N5). Next: the
+sculpture on v1.5.
 
 **Part 2, the integrated sculpture: in progress.** Status 2026-10-04:
 
@@ -336,6 +341,55 @@ highest sample in the run is 19.9 mV, inside a wake; **no sleep near 3 mA or
 held at 0.4 mA**. Sleeps settle to ~0.6 mV, ~15-20 uA. **USB CDC is not the
 cause.** Left: v3's pin parking and holds (bisect B).
 
+**N3 - bisect B, 2026-10-23: `sleep_min -DPARK=1`, `CDCOnBoot=cdc`, 3.3 V into
+`3V3`, 5 min, 18 sleeps.** `../2026-10-23/N3_sleep_min_park_3V3.csv`. Only v3's
+phase 0 `parkPins()` added: `INPUT_PULLUP` + `gpio_hold_en` on GPIO20 and GPIO2,
+`INPUT_PULLDOWN` + hold on GPIO10, `gpio_deep_sleep_hold_en()`.
+
+* **Both v3 levels are back**: **15 of 18 sleeps high, 2.8-3.4 mA**; 3 low at
+  **0.51 mA** (5.6 mV). Without the holds (N1, N2) the same sketch sleeps at
+  ~20 uA. **The pin holds cause it** - on pins with nothing connected.
+* The high level comes in several repeating steps: 34.7, 32.5, 31.3, 30.3,
+  28.5 mV - as if several independent contributions switch on and off.
+  Untested idea: a held pad keeps its input buffer on but not its pull, and
+  floats - which would also fit the ~10 s ramps.
+* Wakes from a high sleep are only small bumps on CH2, so read sleeps from the
+  trace by the 17 s period, not by a wake detector.
+* Still unexplained: v1 had the same three holds and measured 25 uA in part 1.
+
+Next: `-DPARK=1 -DPARK_MASK=<n>` holds one pin at a time (1 = GPIO20,
+2 = GPIO2, 4 = GPIO10); `-DPARK_GLOBAL=0` drops `gpio_deep_sleep_hold_en()`.
+
+**Online, 2026-10-23:** others report the same. On a bare C3 at 3.3 V:
+`esp_deep_sleep_start()` alone 7 uA, adding `gpio_deep_sleep_hold_en()` 98 uA,
+plus `INPUT_PULLUP` on two pins 3 mA; dropping the hold call brought it under
+10 uA (forum.arduino.cc/t/esp32-c3-deep-sleep-weird-power-draw-use-cases/1413974).
+ESP-IDF #12183 (C3): `esp_deep_sleep_start()` sets the pads' pulls itself, and
+holds override it. Nothing official explains the mA. The bisect builds (one
+pin at a time) were skipped in favour of testing the node firmware directly.
+
+**N4 - node firmware v1.5, `PARK_PINS 0`, built `-DCYCLE_S=15 -DHOLD_S=15`,
+bare board, 3.3 V into `3V3`, 5 min, 20 wakes.**
+`../2026-10-23/N4_node_v15_nopark_3V3.csv`. Wakes every ~15.2 s, each a small
+bump (~1.7 mV): with VSENSE floating the node read below `v_floor` and took the
+**hold path** every time (read Vcap, sleep). **Sleeps ~0.9 mV = ~45 uA, no high
+sleeps, highest sample 1.8 mV.** Without parking, the node's sleep path is
+clean. Not yet tested: the full-cycle path (I2C + e-paper SPI before sleep) -
+tie GPIO3 (D1) to `3V3` so VSENSE reads ~6.6 V and every wake is a full cycle.
+
+**N5 - as N4, GPIO3 (VSENSE) tied to 3.3 V, 5 min, 12 cycles.**
+`../2026-10-23/N5_node_v15_nopark_fullcycle.csv`. Every wake is now a full cycle
+(I2C scan, e-paper refresh into nothing), ~9 s awake (CH2 pinned at the top of
+the screen, ~40 mV - this run does not measure the awake current), then 15 s
+asleep, period ~24 s. **Every sleep settles to ~0.9-1.2 mV = ~45-80 uA, no
+0.5 / 3 mA sleeps.** Both of the node's sleep paths are clean without parking.
+
+**Conclusion of part 1c:** the 0.5 / 3 mA sleeps on the bare XIAO are caused by
+`parkPins()` - pulls latched with `gpio_hold_en` + `gpio_deep_sleep_hold_en()`
+before deep sleep. Node firmware v1.5 has `PARK_PINS 0`. Not yet shown: that
+this also fixes the sculpture's ~0.86 mA / 340 uA, where the BME280 breakout's
+pull-ups and the e-paper are attached.
+
 ## Part 2 - the integrated sculpture
 
 Everything on the sculpture is soldered, including the e-paper, so the one
@@ -522,7 +576,56 @@ only if S2's sleep looks odd.
 5. Only then the soldering splits below: **e-paper VCC off**, then **BME280 VCC
    and GND off together**.
 
-## Where this left off - 2026-10-16
+## Where this left off - 2026-10-23
+
+**Found: `parkPins()` causes the 0.5 / 3 mA sleeps.** On the bare XIAO, a bare
+sleep sketch draws ~20 uA (N1, N2); adding the node's `parkPins()` gives 0.51 /
+~3 mA at random (N3); node firmware **v1.5 with `PARK_PINS 0`** sleeps at
+~45-80 uA on both its hold path (N4) and full-cycle path (N5). See *Part 1c*.
+
+**Bench state, as left:**
+
+* **breadboard XIAO** (MAC 94:a9:90:6b:62:7c) running **node firmware v1.5**,
+  test build `-DCYCLE_S=15 -DHOLD_S=15` - not the 300 s default
+* **lab supply 3.30 V straight into `3V3`**, `5V` open. Never more than 3.3 V on
+  that pin. Disconnect it before plugging in USB
+* **GPIO3 (D1, VSENSE) jumpered to 3.3 V** so every wake is a full cycle
+* 10.1 ohm low-side shunt, no 1N5817, no zero wire, 10k off D8, no USB
+* scope **192.168.94.72** (DHCP moves it; `tools/scope_log.py --list`):
+  CH1 on D3 (1 V/div, -2 V, probe 10x); **CH2 clipped on the shunt's leads**
+  (5 mV/div, -15 mV, 1x, 20 MHz, average 4); CH3 on D8 (1 V/div, -2 V, 1x)
+* zero = CH2 tip on its own ground clip = 0.43 mV (2026-10-16)
+* the sculpture is untouched since 2026-10-04: still on `sleep_probe` v3
+
+**Next:**
+
+1. **The sculpture:** flash node v1.5 (300 s default, or a `-DCYCLE_S=60` test
+   build) and measure its sleep the part 2 way (lab supply on pin X, shunt, cap
+   off at the jumper). Power-cycle after flashing - v1.4's holds survive a
+   reflash (v1.5's `unparkPins()` also releases them on every boot now). If the
+   ~0.86 mA falls to tens of uA, the night problem is solved in firmware.
+2. Then set the sculpture back to normal running: `node_cfg.py cycle_s=300`,
+   jumper cap on, USB off, and charge the cap first (it was at 3.10 V).
+3. Open, lower priority: why v1 (same holds) measured 25 uA in part 1; the
+   one-pin-at-a-time bisect (`sleep_min -DPARK=1 -DPARK_MASK=1/2/4`,
+   `-DPARK_GLOBAL=0`) would say which hold does it.
+
+**Flashing (no arduino-cli upload):** supply off, USB in, BOOT dance, then
+
+```
+arduino-cli compile --fqbn esp32:esp32:XIAO_ESP32C3:CDCOnBoot=default --build-property "compiler.cpp.extra_flags=-DCYCLE_S=15 -DHOLD_S=15" --output-dir <out> proto_epaper_esp32c3
+esptool --chip esp32c3 --port COM7 --baud 460800 --before no-reset --after hard-reset write-flash -z --flash-mode keep --flash-freq keep --flash-size keep 0x0 <out>/<sketch>.ino.bootloader.bin 0x8000 <out>/<sketch>.ino.partitions.bin 0xe000 <core>/tools/partitions/boot_app0.bin 0x10000 <out>/<sketch>.ino.bin
+```
+
+(`sleep_min` is built with `CDCOnBoot=cdc`, i.e. CDC disabled on the XIAO.)
+`compile` exits 1 on a harmless post-build hook. Then USB out, supply on.
+
+**Measuring:** `python tools/scope_log.py --ip 192.168.94.72 --channel 1,2,3
+--interval 0.25 --duration 300 --out sleep_current/data/<date>/<ID>.csv`.
+Current = (CH2 - 0.43 mV) / 10.1 ohm. Read a sleep from its last 2 s - CH2
+decays for ~10 s after every wake.
+
+### Previous handoff - 2026-10-16
 
 **The finding of the day: the board is fine, `sleep_probe` v3 causes the 0.4 /
 3 mA sleeps.** A bare `sleep_min` sleeps at ~15-90 uA with no high sleeps at all
@@ -542,7 +645,7 @@ only if S2's sleep looks odd.
 * **lab supply 3.30 V straight into `3V3`, `5V` open** (bypasses charger and
   regulator). Never put more than 3.3 V on that pin. Disconnect it before USB
 * 10.1 ohm low-side shunt, **no 1N5817, no zero wire**, **10k off D8**, no USB
-* scope 192.168.94.12: **CH1 on D3** (1 V/div, offset -2 V, scope probe 10x);
+* scope **192.168.94.72** (moved from .12 by 2026-10-23; `tools/scope_log.py --list` finds it): **CH1 on D3** (1 V/div, offset -2 V, scope probe 10x);
   **CH2 clipped directly on the shunt resistor's leads** (5 mV/div, offset
   -15 mV, 1x, 20 MHz, average 4); **CH3 on D8** (1 V/div, -2 V, scope probe 1x)
 * **zero = CH2 tip on its own ground clip = 0.43 mV.** Not a jumper across the
@@ -581,7 +684,7 @@ there. Then USB out, supply on (that power cycle also clears old holds).
 **Measuring (5 min, ~17 sleeps):**
 
 ```
-python tools/scope_log.py --ip 192.168.94.12 --channel 1,2,3 --interval 0.25 --duration 300 --out sleep_current/data/<date>/<ID>.csv
+python tools/scope_log.py --ip 192.168.94.72 --channel 1,2,3 --interval 0.25 --duration 300 --out sleep_current/data/<date>/<ID>.csv
 ```
 
 Current = (CH2 - 0.43 mV) / 10.1 ohm. Low v3 sleep ~4.5-5.7 mV, high ~30-33 mV;
