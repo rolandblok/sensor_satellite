@@ -49,6 +49,12 @@ sculpture, v1.5 sleeps at a steady ~175 uA (V1)** - down from ~0.86 mA, and no
 second level. The ~130 uA left above the bare board is the attached modules or
 the wiring; not yet split.
 
+**2026-10-30: the full cycle on the sculpture (V2, V3).** With a panel refresh
+on every wake, v1.5 still sleeps at a steady **~170-200 uA**. A wake averages
+**~16 mA (peak ~22-27 mA)** and costs **~190 mC**; about one wake in twelve runs
+long, ~270 mC, cause unknown. At a 300 s cycle that is **~0.8 mA average, ~75%
+of it the wake** - the sleep current is no longer the main cost.
+
 **Part 2, the integrated sculpture: in progress.** Status 2026-10-04:
 
 * The sculpture sleeps at **~0.86-1.0 mA** on the lab supply at 4.5 V, cap and
@@ -501,6 +507,8 @@ Those millivolts are the flash log's units, so they compare directly with the
 | **U1** | BME280 **VCC wire only** unsoldered; SDA, SCL, GND still connected. `sleep_probe` v3 | ~25-50 uA if the BME280 was the load | is it the BME280? | **2026-10-04: not lower - ~1.4 mA rising to ~1.8 mA over 2 min** (CH2 15.1 -> 18.9 mV at 5 mV/div, offset -15 mV; no zero taken at that setting yet, so +-0.1 mA). Wakes normal, every ~31.5 s. **Not clean:** with only VCC off, the BME280 is back-powered through SDA/SCL, which the C3 holds high with its pull-ups during sleep - that can draw odd, drifting current. SDA and SCL must come off too, or the whole breakout. `U1_no_bme.csv` (2 mV/div, partly clipped), `U1_no_bme_5mVdiv.csv` |
 | **U2** | BME280 VCC soldered back (its GND may have been a poor joint; reflowed). DMM: SDA and SCL read high at the BME280 during sleep | | did the poor GND or the loose VCC cause it? | **2026-10-04: back to ~0.86 mA** (CH2 ~9.17 mV at 5 mV/div offset -15 mV, one sleep in four ~9.95 mV; no zero at this setting yet, +-0.05 mA). **The resoldering changed nothing, and SDA/SCL are high asleep, so the breakout's pull-ups draw nothing.** `U2_bme_resoldered.csv` |
 | **V1** | 2026-10-23: node **v1.5** (`PARK_PINS 0`), test build `-DCYCLE_S=15 -DHOLD_S=15 -DCYCLE_MIN_S=10`, NVS `cycle_s` 15 / `poll_s` 15. Supply 4.5 V on pin X, jumper off, cap 3.12 V - below `v_floor`, so every wake is the **hold path** (read Vcap, sleep; no panel refresh, which is why the panel's counter did not move). 5 min, CH2 only | tens of uA if `parkPins()` was the sculpture's cause too | does v1.5 fix the sculpture? | **Sleep a steady ~2.24 mV = ~175 uA** (CH2 median, 0.43 mV zero from the breadboard - no zero taken on the sculpture yet), **no high sleeps**. Down from ~0.86 mA: the holds were most of it here as well. The ~130 uA above the bare board (N4, ~45 uA) is the BME280 breakout, the e-paper module or the wiring - not yet split. Full-cycle path on the sculpture not measured yet. `../2026-10-23/V1_sculpture_v15_nopark_4V5.csv` |
+| **V2** | 2026-10-30: as V1, but the cap at 3.76 V (a USB plug-in cold boot cleared the hold latch, and 3.76 V is above `v_hold`), so every wake is the **full cycle** with a panel refresh. Supply 4.5 V on pin X, jumper off, USB out. 5 min. CH2 on the shunt; CH1 meant for D3 read nothing (not on D3), CH3 on D8 | ~V1, if the refresh leaves nothing on | does a full cycle leave anything drawing? | **Sleep a steady ~2.27-2.32 mV = ~165-170 uA** with the sculpture zero (0.59 mV, CH2 tip on its own clip, taken after this run), **no high sleeps**. Wake-to-wake ~24 s (15 s sleep + wake). One wake ran ~19 s instead of ~9 s. CH2 clips during wakes and decays for ~8 s after, so no wake current here. `../2026-10-30/V2_sculpture_v15_fullcycle_4V5.csv` |
+| **V3** | 2026-10-30: as V2, plus **CH3 on the shunt, 50 mV/div, offset -150 mV**, for the wake. 5 min. **CH3's probe switch is on 10x and the scope was at 1x for this run: its raw values are 1/10.** Found by V4 (CH1, known 10x, also on the shunt: CH1/CH3 = 9.98, p10-p90 9.92-10.14); the scope is now set to 10x | ~20 mA wake as S2 | what does a full wake cost? | **Wake ~16 mA average, ~22 mA peak, ~190 mC per wake** (CH3 x10, scope averaging smears the edges over ~2-3 s but keeps the area; V4 peaks at 27 mA on CH1). One wake in twelve is long again: ~16 s, ~270 mC. Sleep (CH2) ~170-200 uA, median ~188. At 300 s: ~190 mC + 290 s x 0.19 mA = ~245 mC, **~0.8 mA average**. `../2026-10-30/V3_sculpture_v15_wake_4V5.csv`, `V4_ch1_ch3_crosscheck.csv` |
 | **V** | DMM, supply on pin X | | does VSENSE or the cap leak into the measurement? | Pin V 3.10 V (not the supply's 4.5 V), pin X 0.0 V with the supply off: **the cap is isolated, no hidden path.** D1 1.22 V against the expected 1.55 V: the asleep XIAO loads the tap slightly, a few uA at most. The cap fell from ~3.83 V to 3.10 V while isolated overnight |
 
 **Reading the results:**
@@ -579,7 +587,42 @@ only if S2's sleep looks odd.
 5. Only then the soldering splits below: **e-paper VCC off**, then **BME280 VCC
    and GND off together**.
 
-## Where this left off - 2026-10-23
+## Where this left off - 2026-10-30
+
+**The sculpture's full cycle is measured (V2, V3):** sleep ~170-200 uA, wake
+~16 mA average for ~190 mC, one wake in ~12 long (~270 mC). At 300 s, ~0.8 mA
+average, three quarters of it the wake. See *Part 2*, rows V2 and V3.
+
+**Bench state, as left:**
+
+* **the sculpture** still on the v1.5 **test build** (15 s cycle), NVS
+  `cycle_s` 15 / `poll_s` 15. Supply 4.5 V on pin X, jumper off, USB out. Cap
+  ~3.76 V, charging from the panels
+* scope **192.168.94.35** (moved from .72; `tools/scope_log.py --list`).
+  **CH1** on the shunt, 50 mV/div, -150 mV, probe 10x (noise floor ~12 mV, no
+  use for sleeps). **CH2** on the shunt, 5 mV/div, -15 mV, 1x - the sleep
+  channel; **zero 0.59 mV on the sculpture**. **CH3** on the shunt, 50 mV/div,
+  -150 mV, **probe 10x - its switch is on 10x**, the wake channel
+* nothing on D3 or D8 any more
+
+**Next:**
+
+1. **The long wake**, one in ~12 at ~+40% charge. Catch one on the serial log
+   or the flash log (`tools/dump_log.py`) to see which phase stretches -
+   BME280 retry, panel, or a cold boot.
+2. **The ~130 uA above the bare board** - item 2 below, now under a quarter of
+   the budget.
+3. Items 3 and 4 below (supervisor, normal running) unchanged.
+4. Aside, not chased: on the cap the panel sometimes refreshed to full white;
+   on the supply it did not. Possibly a brownout mid-refresh - the flash log
+   would show `LF_INCOMPLETE` records.
+
+**Measuring:** `python tools/scope_log.py --ip 192.168.94.35 --channel 3,2
+--interval 0.25 --duration 300 --out ...`. Wake current = CH3 / 10.1 ohm,
+sleep current = (CH2 - 0.59 mV) / 10.1 ohm, read in the last ~1.5 s before
+CH2 starts to rise. A blank CH2 field is off-screen (a wake).
+
+### Previous handoff - 2026-10-23
 
 **Found: `parkPins()` causes the 0.5 / 3 mA sleeps.** On the bare XIAO, a bare
 sleep sketch draws ~20 uA (N1, N2); adding the node's `parkPins()` gives 0.51 /
