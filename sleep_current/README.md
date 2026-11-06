@@ -616,9 +616,11 @@ average, three quarters of it the wake. See *Part 2*, rows V2 and V3.
 3. **Supervisor:** the MCP111T-300E/TT passed a bench test loose (R3 gives its
    reset-state cost, ~0.49 mA). Fit it and test in place - `gpio_xiao.md`,
    *MCP111 supervisor on EN*. Then item 4 below (normal running).
-4. Aside, not chased: on the cap the panel sometimes refreshed to full white;
-   on the supply it did not. Possibly a brownout mid-refresh - the flash log
-   would show `LF_INCOMPLETE` records.
+4. Aside: on the cap the panel sometimes refreshed to full white. 2026-11-06:
+   it did on USB too, and the flash log has no `LF_INCOMPLETE` records, so it
+   is not a brownout. Most likely the blind 4100 ms refresh wait (BUSY is not
+   wired), only ~90 ms over the measured 4012 ms. v1.6 adds 400 ms - watch
+   whether the white frames stop. See `../data/2026-11-06/analysis.md`.
 
 **Measuring:** `python tools/scope_log.py --ip 192.168.94.35 --channel 3,2
 --interval 0.25 --duration 300 --out ...`. Wake current = CH3 / 10.1 ohm,

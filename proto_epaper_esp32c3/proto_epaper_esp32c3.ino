@@ -29,7 +29,7 @@
                                // DEFAULT only: the live value is cfg.cycleS, which
                                // the serial console can change - see "settings"
 #define LOG_S           2      // serial log interval when not deep sleeping
-#define FW_VERSION      "v1.5" // shown small, bottom right of every frame. Bump it
+#define FW_VERSION      "v1.7" // shown small, bottom right of every frame. Bump it
                                // when reflashing, so a panel photograph says
                                // which build produced it.
 #define ALTITUDE_M      17.0f  // Eindhoven, ~17 m AMSL - for sea-level pressure
@@ -82,6 +82,15 @@
 // that when cold, and this is an indoor sculpture. GPIO10 / D10 is now free.
 #define EPD_BUSY  -1           // was GPIO10 / XIAO D10
 #define EPD_MISO  -1           // MUST be -1, or SPI claims a pin already in use
+
+// Extra wait after GxEPD2's blind 4100 ms full refresh, so the whole wait is
+// 4.5 s. Added in v1.6: ~90 ms margin over the measured 4012 ms was not enough
+// - the panel came up white, on the cap and on USB alike. Cut short, the next
+// SPI traffic lands mid-waveform: GxEPD2 rewrites the image RAM straight after
+// the wait (writeImageAgain), then hibernate() sends deep sleep. Applied inside
+// the driver's refresh() (EpdPanel, below), not after nextPage(), because that
+// RAM rewrite happens inside nextPage(). Costs 400 ms awake per refresh.
+#define EPD_FULL_MARGIN_MS 400
 
 // I2C bus, pinned rather than auto-detected - the sweep would otherwise drive
 // the VSENSE tap as a bus line. Set both to -1 to sweep again; the candidate
@@ -186,8 +195,24 @@
   #define EPD_CLASS GxEPD2_290
 #endif
 
-GxEPD2_BW<EPD_CLASS, EPD_CLASS::HEIGHT> display(
-    EPD_CLASS(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
+// The panel driver with EPD_FULL_MARGIN_MS added to every full refresh. The
+// library's refresh time is a static const in its header; this keeps the
+// library unpatched. refresh() is virtual in GxEPD2_EPD, so the library's own
+// internal calls get the margin too.
+class EpdPanel : public EPD_CLASS {
+ public:
+  using EPD_CLASS::EPD_CLASS;
+  void refresh(bool partial_update_mode = false) override {
+    EPD_CLASS::refresh(partial_update_mode);
+    if (!partial_update_mode) delay(EPD_FULL_MARGIN_MS);
+  }
+  void refresh(int16_t x, int16_t y, int16_t w, int16_t h) override {
+    EPD_CLASS::refresh(x, y, w, h);
+  }
+};
+
+GxEPD2_BW<EpdPanel, EpdPanel::HEIGHT> display(
+    EpdPanel(EPD_CS, EPD_DC, EPD_RST, EPD_BUSY));
 
 Adafruit_BME280 bme;
 
@@ -737,14 +762,17 @@ static void drawRight(const char *s, int16_t xRight, int16_t y) {
 }
 
 // Trend marker. The GFX fonts here are ASCII only - no arrow glyphs - so the
-// triangle is drawn. Inside the deadband it is a bar: a 4 F cap moves ~70 mV per
-// cycle when the node is losing ground, so +-20 mV of ADC spread is genuinely
-// "flat" and an arrow that flickered on noise would teach the wrong thing.
-static void drawTrend(int16_t x, int16_t yBase, float dv) {
+// triangle is drawn. Inside the deadband nothing is drawn: a 4 F cap moves
+// ~70 mV per cycle when the node is losing ground, so +-20 mV of ADC spread is
+// genuinely "flat" and an arrow that flickered on noise would teach the wrong
+// thing. (Up to v1.6 the deadband drew a bar, which read as a big minus sign.)
+// Returns whether it drew anything.
+static bool drawTrend(int16_t x, int16_t yBase, float dv) {
   const float mv = dv * 1000.0f;
   if (mv >  TREND_MV)      display.fillTriangle(x, yBase, x + 10, yBase, x + 5, yBase - 9, GxEPD_BLACK);
   else if (mv < -TREND_MV) display.fillTriangle(x, yBase - 9, x + 10, yBase - 9, x + 5, yBase, GxEPD_BLACK);
-  else                     display.fillRect(x, yBase - 6, 10, 2, GxEPD_BLACK);
+  else                     return false;
+  return true;
 }
 
 // Small print: the built-in 5x7 font at size 1, half the height of the 9 pt
@@ -766,9 +794,8 @@ static int16_t drawSmallRight(const char *s, int16_t xRight, int16_t y) {
 
 // Header is shared by every frame: what this is, Vcap, the charge trend and the
 // boot counter. Laid out right to left. The trend is what the sleep gained - the
-// whole "is there enough light" readout. The marker carries the direction, so
-// the number is printed unsigned; a signed one next to the flat bar read as a
-// double minus.
+// whole "is there enough light" readout. The number always carries its sign,
+// in the small font; the triangle only appears beyond the +-TREND_MV deadband.
 static void drawHeader(const Reading &r) {
   char buf[16];
   const int16_t y = 15;
@@ -779,10 +806,10 @@ static void drawHeader(const Reading &r) {
   snprintf(buf, sizeof(buf), "#%lu", (unsigned long)bootCount);
   int16_t x = drawSmallRight(buf, display.width() - 4, y);
   if (r.haveTrend) {
-    snprintf(buf, sizeof(buf), "%.0f mV", fabsf(r.dv * 1000.0f));
+    // Rounded first, so a -0.4 mV change prints "+0", never "-0".
+    snprintf(buf, sizeof(buf), "%+ld mV", lroundf(r.dv * 1000.0f));
     x = drawSmallRight(buf, x - 8, y);
-    x -= 14;
-    drawTrend(x, y, r.dv);
+    if (drawTrend(x - 14, y, r.dv)) x -= 14;
   }
   snprintf(buf, sizeof(buf), "%.2f V", r.vcap);
   drawRight(buf, x - 6, y);
