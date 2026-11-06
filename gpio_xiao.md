@@ -124,6 +124,81 @@ Eight signals into eleven pins, two spare, plus a pull-up on the third. Two
 differences from the SuperMini: the I²C bus, because GPIO0 and GPIO1 are not
 bonded out here, and BUSY, which is not wired at all.
 
+### MCP111 supervisor on EN — bench-tested 2026-10-30, not yet fitted
+
+**Why.** On 2026-10-03 the node died at ~2.75–2.83 V and did not come back the
+next day, although the panels had light (`data/2026-10-03/analysis.md`, finding
+2). Near brownout the C3 keeps trying to start, and each attempt costs more than
+the panels bring in. Firmware cannot fix that: below the point where the chip
+runs there is no firmware. A voltage supervisor holds the chip in reset below
+its trip point, and lets go once, cleanly, when the cap is back above it.
+
+**The part.** **MCP111T-300E/TT** — Microchip micropower voltage detector.
+**Open-drain** output (the MCP112 is the push-pull one), active low, trip point
+code `300`, **measured trip 2.8–2.9 V** (below), SOT-23-3. Draws ~1 µA.
+
+```
+              XIAO 5V pin (XIAO side of the VCAP jumper)
+              │
+              │ 3  VDD       the single leg is pin 3
+         ┌────┴────┐
+         │  (code)  │         top view, marking readable
+         └─┬─────┬─┘
+           1     2
+         VOUT   VSS
+           │     │
+           │     └──── XIAO GND
+           │
+           └────────── XIAO EN (RESET button pad at ~3.3 V)
+```
+
+**Bench test, loose part, 2026-10-30 — passed.** Lab supply at 3.3 V with a
+~10 mA current limit, VDD to +, VSS to −, a 10k from VOUT to +, DMM on VOUT.
+VOUT followed the supply at 3.3 V, dropped to ~0 V when the supply was turned
+down to **between 2.8 and 2.9 V** (read on the supply's own display, so
+±~0.05 V), and came back when it was turned up again. That proves the pinout
+above. The margin is thin: the node's last good poll on 2026-10-03 was at
+2.834 V and it died around 2.75 V, so the trip sits at or just above the
+lock-up. Worth a closer reading with the DMM on VDD instead of the supply's
+display, and a look at the datasheet's trip table for the `300` code.
+
+The supply's current display read **0** throughout: the ~0.3 mA
+through the 10k with VOUT low, and the detector's ~1 µA, are below its
+resolution. So the display only catches a gross fault — a wrong pin running
+into the ~10 mA limit — not the part's own draw.
+
+**Wiring on the sculpture:**
+
+| MCP111 | To | Why |
+| ------ | -- | --- |
+| 3 VDD | `5V` pin — the XIAO side of the VCAP jumper | it watches the cap voltage the board actually gets; on the cap side it would sit on the isolated cap during USB work |
+| 2 VSS | GND | |
+| 1 VOUT | **EN** — on the RESET button | EN is not on the castellated pins. With the board powered, the button pads at ~3.3 V are EN, the ones at 0 V are GND. Solder quickly: the button's plastic melts |
+
+No pull-up is added: the XIAO already has one on EN, which the open-drain output
+pulls against. **No firmware change.** `v_floor` (3.25 V) sits above the trip
+point, so the firmware holds the node first, and the MCP111 only takes over
+below ~2.85 V. On release the board boots, sees the cap below `v_floor` and goes
+straight back to deep sleep — a ~0.3 s wake, 1–2 mV off a 4 F cap, well inside
+the detector's hysteresis, so it does not bounce back into reset.
+
+**What being held in reset costs: ~0.49 mA**, against ~0.165 mA in deep sleep
+(row R3 in [sleep_current/README.md](sleep_current/README.md), RESET held by hand).
+The ~0.33 mA difference is 3.3 V across the EN pull-up, so the XIAO's is
+probably 10k. It only flows on a cap that is already below ~2.85 V and makes it
+flatter before morning; it does not stop recovery. Indoor harvest at a low cap
+voltage is ~1.3 mA averaged over an afternoon and 2–4 mA measured (2026-10-03,
+2026-08-21), so the cap still climbs at +0.8 to +3.5 mA — from 2.3 V back to
+the trip point in roughly 15 minutes to an hour. Only a day averaging below ~0.5 mA
+would not recover, and without the supervisor it would not either. A weaker EN
+pull-up (say 100k, replacing the one on the XIAO) would cut the cost, if it ever
+matters.
+
+**After fitting, test it in place:** supply on pin X, jumper off, scope on the
+shunt. Step 3.5 V → 2.7 V → 3.5 V: below ~2.85 V the board must stop and the
+current settle at ~0.49 mA; back above, it must boot once and hold (cap below
+3.25 V) or run (above).
+
 ### D8 has a 10k pull-up to 3V3 — added 2026-09-27
 
 GPIO8 is a strapping pin that must be HIGH at reset, and until now nothing but
